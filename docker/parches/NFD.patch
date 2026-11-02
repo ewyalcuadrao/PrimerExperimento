@@ -1,0 +1,12 @@
+diff --git a/daemon/fw/strategy.cpp b/daemon/fw/strategy.cpp
+index a0df5eb3..221ba7f5 100644
+--- a/daemon/fw/strategy.cpp
++++ b/daemon/fw/strategy.cpp
+@@ -273,6 +273,7 @@ Strategy::sendData(const Data& data, Face& egress, const shared_ptr<pit::Entry>&
+     // mark PIT satisfied
+     pitEntry->isSatisfied = true;
+   }
++  return true;
+ }
+ 
+ void

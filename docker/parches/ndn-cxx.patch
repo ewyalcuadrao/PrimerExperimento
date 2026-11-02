@@ -1,0 +1,30 @@
+diff --git a/ndn-cxx/util/scheduler.cpp b/ndn-cxx/util/scheduler.cpp
+index dd257714..bd20f5c0 100644
+--- a/ndn-cxx/util/scheduler.cpp
++++ b/ndn-cxx/util/scheduler.cpp
+@@ -143,6 +143,13 @@ Scheduler::cancelAllEvents()
+ void
+ Scheduler::scheduleNext()
+ {
++  // Cancelar el temporizador anterior: si no, cada vez que un evento nuevo pasa a
++  // ser el primero queda un temporizador huérfano que se reprograma para siempre
++  // (executeEvent -> scheduleNext) y el número de eventos crece con el tiempo.
++  if (m_timerEvent) {
++    ns3::Simulator::Cancel(*m_timerEvent);
++    m_timerEvent.reset();
++  }
+   if (!m_queue.empty()) {
+     m_timerEvent = ns3::Simulator::Schedule(ns3::NanoSeconds((*m_queue.begin())->expiresFromNow().count()),
+                                             &Scheduler::executeEvent, this);
+diff --git a/ndn-cxx/util/scheduler.hpp b/ndn-cxx/util/scheduler.hpp
+index f7102642..136b7e2b 100644
+--- a/ndn-cxx/util/scheduler.hpp
++++ b/ndn-cxx/util/scheduler.hpp
+@@ -28,6 +28,7 @@
+ 
+ #include "ns3/simulator.h"
+ 
++#include <optional>
+ #include <set>
+ 
+ namespace ndn {

@@ -1,0 +1,202 @@
+{
+  "fuente": "testbed-nodes.json",
+  "nodes": [
+    {
+      "id": "UCLA",
+      "rol": "router",
+      "nombre": "University of California, Los Angeles",
+      "prefijo": "/ndn/edu/ucla",
+      "posicion": [
+        34.0728225,
+        -118.4387398
+      ]
+    },
+    {
+      "id": "ARIZONA",
+      "rol": "router",
+      "nombre": "The University of Arizona",
+      "prefijo": "/ndn/edu/arizona",
+      "posicion": [
+        32.2289614,
+        -110.9483226
+      ]
+    },
+    {
+      "id": "WU",
+      "rol": "router",
+      "nombre": "Washington University in St. Louis",
+      "prefijo": "/ndn/edu/wustl",
+      "posicion": [
+        38.6490701,
+        -90.3033471
+      ]
+    },
+    {
+      "id": "MEMPHIS",
+      "rol": "router",
+      "nombre": "University of Memphis",
+      "prefijo": "/ndn/edu/memphis",
+      "posicion": [
+        35.1186099,
+        -89.93700109999999
+      ]
+    },
+    {
+      "id": "UFBA",
+      "rol": "router",
+      "nombre": "Federal University of Bahia, Brazil",
+      "prefijo": "/ndn/br/ufba",
+      "posicion": [
+        -12.9997,
+        -38.5076
+      ]
+    },
+    {
+      "id": "cli-ucla",
+      "rol": "consumer",
+      "nombre": "Cliente en la red de UCLA (como 131.179.196.7 en la traza)",
+      "hub": "UCLA"
+    },
+    {
+      "id": "cli-arizona",
+      "rol": "consumer",
+      "nombre": "Cliente en la red de Arizona",
+      "hub": "ARIZONA"
+    },
+    {
+      "id": "cli-ufba",
+      "rol": "consumer",
+      "nombre": "Cliente en la red de UFBA",
+      "hub": "UFBA"
+    },
+    {
+      "id": "wu-server",
+      "rol": "producer",
+      "nombre": "Servidor de WU: documento weekly-call-doc y grabaciones de cursos",
+      "hub": "WU"
+    },
+    {
+      "id": "yoursunny-iah",
+      "rol": "producer",
+      "nombre": "Nodo yoursunny en Houston: ping y réplica de software",
+      "hub": "MEMPHIS"
+    },
+    {
+      "id": "ucla-media",
+      "rol": "producer",
+      "nombre": "Emisión de clases de UCLA (inventado)",
+      "hub": "UCLA"
+    },
+    {
+      "id": "iot-gw",
+      "rol": "producer",
+      "nombre": "Pasarela de sensores IoT de UFBA (inventado)",
+      "hub": "UFBA"
+    },
+    {
+      "id": "az-weather",
+      "rol": "producer",
+      "nombre": "Estaciones meteorológicas de Arizona (inventado)",
+      "hub": "ARIZONA"
+    }
+  ],
+  "links": [
+    {
+      "source": "UCLA",
+      "target": "ARIZONA",
+      "DataRate": "100Mbps",
+      "Delay": "7ms",
+      "km": 727
+    },
+    {
+      "source": "UCLA",
+      "target": "WU",
+      "DataRate": "100Mbps",
+      "Delay": "26ms",
+      "km": 2560
+    },
+    {
+      "source": "ARIZONA",
+      "target": "WU",
+      "DataRate": "100Mbps",
+      "Delay": "20ms",
+      "km": 1996
+    },
+    {
+      "source": "ARIZONA",
+      "target": "MEMPHIS",
+      "DataRate": "100Mbps",
+      "Delay": "20ms",
+      "km": 1967
+    },
+    {
+      "source": "WU",
+      "target": "MEMPHIS",
+      "DataRate": "100Mbps",
+      "Delay": "4ms",
+      "km": 394
+    },
+    {
+      "source": "WU",
+      "target": "UFBA",
+      "DataRate": "100Mbps",
+      "Delay": "79ms",
+      "km": 7864
+    },
+    {
+      "source": "MEMPHIS",
+      "target": "UFBA",
+      "DataRate": "100Mbps",
+      "Delay": "76ms",
+      "km": 7610
+    },
+    {
+      "source": "cli-ucla",
+      "target": "UCLA",
+      "DataRate": "100Mbps",
+      "Delay": "2ms"
+    },
+    {
+      "source": "cli-arizona",
+      "target": "ARIZONA",
+      "DataRate": "100Mbps",
+      "Delay": "2ms"
+    },
+    {
+      "source": "cli-ufba",
+      "target": "UFBA",
+      "DataRate": "100Mbps",
+      "Delay": "2ms"
+    },
+    {
+      "source": "wu-server",
+      "target": "WU",
+      "DataRate": "100Mbps",
+      "Delay": "2ms"
+    },
+    {
+      "source": "yoursunny-iah",
+      "target": "MEMPHIS",
+      "DataRate": "100Mbps",
+      "Delay": "2ms"
+    },
+    {
+      "source": "ucla-media",
+      "target": "UCLA",
+      "DataRate": "100Mbps",
+      "Delay": "2ms"
+    },
+    {
+      "source": "iot-gw",
+      "target": "UFBA",
+      "DataRate": "100Mbps",
+      "Delay": "2ms"
+    },
+    {
+      "source": "az-weather",
+      "target": "ARIZONA",
+      "DataRate": "100Mbps",
+      "Delay": "2ms"
+    }
+  ]
+}

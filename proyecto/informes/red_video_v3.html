@@ -1,0 +1,545 @@
+<title>Red de vídeo ISP v3</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: una columna de lectura; el mapa y su ficha de nodo lado a lado en escritorio, apilados en móvil */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --ink: #142033;
+  --muted: #5a6880;
+  --line: #d5dce7;
+  --accent: #1f5fd1;
+  --core: #142033;
+  --agg: #4f6b94;
+  --origin: #7a3fc4;
+  --home: #1f8a70;
+  --rural: #c27a00;
+  --rural-soft: #fbefd6;
+  --noroute: #c63d3d;
+  --noroute-soft: #fbe4e2;
+  --bar: #9db6e3;
+  --bar-peak: #1f5fd1;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e141e; --surface: #161e2b; --ink: #e4e9f1; --muted: #93a0b5; --line: #2a3546;
+    --accent: #6d9eff; --core: #e4e9f1; --agg: #8aa3c8; --origin: #b48af0; --home: #4cc3a2;
+    --rural: #f0ad3c; --rural-soft: #3a2c12; --noroute: #ff7b72; --noroute-soft: #3b1d1d;
+    --bar: #33496e; --bar-peak: #6d9eff; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e141e; --surface: #161e2b; --ink: #e4e9f1; --muted: #93a0b5; --line: #2a3546;
+  --accent: #6d9eff; --core: #e4e9f1; --agg: #8aa3c8; --origin: #b48af0; --home: #4cc3a2;
+  --rural: #f0ad3c; --rural-soft: #3a2c12; --noroute: #ff7b72; --noroute-soft: #3b1d1d;
+  --bar: #33496e; --bar-peak: #6d9eff; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(30px, 5vw, 46px); font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 26px; font-weight: 700; }
+h3 { font-size: 17px; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 0.9em; }
+header { display: grid; gap: 14px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 28px; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.facts b { color: var(--ink); font-weight: 500; }
+nav { display: flex; flex-wrap: wrap; gap: 8px; }
+nav a { font-size: 13px; color: var(--accent); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; background: var(--surface); }
+nav a:hover, nav a:focus-visible { border-color: var(--accent); outline: none; }
+section { display: grid; gap: 20px; scroll-margin-top: 16px; }
+.sub { display: grid; gap: 12px; }
+
+/* Mapa */
+.mapgrid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+@media (max-width: 860px) { .mapgrid { grid-template-columns: minmax(0, 1fr); } }
+.mapbox { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+.mapbox svg { display: block; width: 100%; min-width: 640px; height: auto; }
+svg text { font-family: var(--mono); fill: var(--ink); }
+.lbl { font-size: 11px; }
+.lbl-small { font-size: 10px; fill: var(--muted); }
+.city { font-family: var(--display); font-size: 13px; font-weight: 700; fill: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.node { cursor: pointer; }
+.node:focus { outline: none; }
+.node:focus-visible .shape, .node.sel .shape { stroke: var(--accent); stroke-width: 3; }
+.link { fill: none; stroke-linecap: round; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 12px; }
+.panel dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
+.panel dt { color: var(--muted); }
+.panel dd { margin: 0; font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.panel .hint { font-size: 13px; color: var(--muted); }
+.chip { display: inline-block; font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.chip.rural { color: var(--rural); }
+.chip.nr { color: var(--noroute); }
+.legend { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Tablas */
+.tbl { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); white-space: nowrap; }
+tr.flag td { background: var(--rural-soft); }
+tfoot td { font-weight: 600; border-top: 1px solid var(--line); }
+.cell-bar { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.cell-bar i { display: block; height: 8px; border-radius: 2px; background: var(--noroute); }
+code { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+.want { color: var(--home); }
+.none { color: var(--muted); font-style: italic; font-family: var(--body); }
+
+/* Gráfico horario */
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 16px 8px; overflow-x: auto; }
+.chart svg { display: block; width: 100%; min-width: 520px; height: auto; }
+.grid line { stroke: var(--line); }
+.axis text { font-size: 10px; fill: var(--muted); }
+
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+.cols > * { min-width: 0; }
+.kv { display: grid; gap: 6px; font-size: 14px; }
+.kv div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dashed var(--line); padding-bottom: 4px; }
+.kv div span:last-child { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.note { border-left: 3px solid var(--rural); padding: 4px 0 4px 14px; display: grid; gap: 6px; }
+.note.nr { border-left-color: var(--noroute); }
+ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; max-width: 70ch; }
+
+/* Escalera de la traza */
+.ladder { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; padding: 12px; }
+.ladder svg { display: block; width: 100%; min-width: 600px; height: auto; }
+@media (prefers-reduced-motion: no-preference) { .node .shape { transition: stroke-width .15s; } }
+</style>
+<style>
+.grp rect { fill: var(--bg); stroke: var(--line); stroke-width: 1.2; }
+.grp text { font-family: var(--display); font-size: 12px; font-weight: 700; fill: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; }
+.decide { fill: none; stroke: var(--noroute); stroke-width: 1.6; stroke-dasharray: 3 3; }
+.tag { font-size: 10px; fill: var(--noroute); }
+.tag-def { font-size: 10px; fill: var(--muted); }
+.cls-ok { color: var(--home); font-weight: 600; }
+.cls-mid { color: var(--rural); font-weight: 600; }
+.cls-fp { color: var(--noroute); font-weight: 600; }
+.stack { display: flex; height: 14px; border-radius: 3px; overflow: hidden; min-width: 160px; background: var(--line); }
+.stack i { display: block; height: 100%; }
+.stack .s-ok { background: var(--home); }
+.stack .s-mid { background: var(--rural); }
+.stack .s-fp { background: var(--noroute); }
+.stack .s-nr { background: var(--muted); }
+.big { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.big > div { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; }
+.big b { font-family: var(--display); font-size: 28px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.big span { font-size: 13px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">ndnSIM 2.9 · resultados/video_v3 · 24 h simuladas · versión 3</div>
+    <h1>Red de vídeo de un ISP español</h1>
+    <p>Un operador con cinco ciudades sirve a 580 hogares tres plataformas: <span class="mono">/vod</span> (series, películas y documentales), <span class="mono">/yt</span> (canales y shorts) y <span class="mono">/rtve</span> (catálogo y directos). En esta versión cada plataforma tiene su propia red de servidores por sección y el núcleo del operador conoce cada título por su prefijo. Así, un nombre que no existe se queda sin ruta en el router de núcleo de la ciudad del usuario, y es allí donde la iteración 2 decide si redirige.</p>
+    <div class="facts">
+      <span><b>38</b> nodos</span><span><b>20</b> routers</span><span><b>8</b> servidores</span><span><b>580</b> usuarios</span>
+      <span><b>3.078</b> sesiones de vídeo</span><span><b>701.448</b> Interests</span><span><b>22,7 M</b> filas de log</span>
+    </div>
+    <nav aria-label="Apartados">
+      <a href="#topologia">Topología</a><a href="#comportamiento">Comportamiento</a><a href="#noroute">NoRoute (iteración 1)</a><a href="#iteracion2">Redirección con FastText (iteración 2)</a>
+    </nav>
+  </header>
+
+  <section id="topologia">
+    <div class="eyebrow">1 · Topología</div>
+    <h2>Cómo está montada la red</h2>
+    <p>Cada plataforma tiene un router de borde y detrás varios servidores, uno por sección del catálogo. Cada servidor anuncia un prefijo por temporada, película o canal: 356 en total. El operador se conecta a las plataformas en dos puntos neutros, Espanix en Madrid y Catnix en Barcelona; YouTube entra por los dos. Las rutas se calculan por camino más corto.</p>
+    <p>No todos los routers saben lo mismo. Las agregaciones y los hogares solo tienen una ruta por defecto hacia arriba. Los cinco routers de núcleo, los puntos neutros y los bordes llevan la tabla completa. Por eso el NoRoute (y la redirección) siempre ocurre en el núcleo, marcado en rojo. Pulsa un nodo para ver su ficha.</p>
+    <div class="legend" aria-hidden="true">
+      <span><svg width="34" height="10"><line x1="2" y1="5" x2="32" y2="5" stroke="var(--core)" stroke-width="4"/></svg>100 Mbps troncal, internacional y centro de datos</span>
+      <span><svg width="34" height="10"><line x1="2" y1="5" x2="32" y2="5" stroke="var(--agg)" stroke-width="2.2"/></svg>10 Mbps agregación</span>
+      <span><svg width="34" height="10"><line x1="2" y1="5" x2="32" y2="5" stroke="var(--home)" stroke-width="1.4"/></svg>2,5 Mbps acceso</span>
+      <span><svg width="34" height="10"><line x1="2" y1="5" x2="32" y2="5" stroke="var(--rural)" stroke-width="2" stroke-dasharray="4 3"/></svg>120 kbps radioenlace rural</span>
+      <span><svg width="14" height="14"><rect x="1" y="1" width="12" height="12" fill="var(--origin)"/></svg>servidor</span>
+      <span><svg width="16" height="14"><polygon points="8,1 15,7 8,13 1,7" fill="var(--origin)"/></svg>borde de plataforma</span>
+      <span><svg width="14" height="14"><circle cx="7" cy="7" r="6" fill="var(--core)"/></svg>núcleo / punto neutro</span>
+      <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="var(--agg)"/></svg>agregación (ruta por defecto)</span>
+      <span><svg width="16" height="14"><rect x="1" y="2" width="14" height="10" rx="3" fill="var(--home)"/></svg>barrio de hogares</span>
+      <span><svg width="18" height="18"><circle cx="9" cy="9" r="7" fill="none" stroke="var(--noroute)" stroke-width="1.6" stroke-dasharray="3 3"/></svg>aquí se decide: NoRoute o redirección</span>
+    </div>
+    <div class="mapgrid">
+      <div class="mapbox"><svg id="map" viewBox="0 0 960 800" role="img" aria-label="Mapa de la topología de la red"></svg></div>
+      <aside class="panel" id="panel" aria-live="polite"></aside>
+    </div>
+    <p class="mono" style="font-size:12.5px;color:var(--muted)">Capacidades y bitrates a escala 1:1000 de los reales. El retardo de cada enlace sale de la distancia entre ciudades: 1 ms por cada 100 km.</p>
+  </section>
+
+  <section id="comportamiento">
+    <div class="eyebrow">2 · Comportamiento</div>
+    <h2>Comportamiento de la red</h2>
+    <div class="sub">
+      <h3>La curva del día</h3>
+      <p>Cada usuario tiene una edad, un dispositivo y un nivel de actividad, y con eso decide cuándo entra y qué ve. Puede ser una maratón de una serie con autoplay, una película, vídeos encadenados, shorts o un directo de RTVE. La carga sigue un día real: mínimo de madrugada, subida a la hora de comer y pico de 21 a 23 h.</p>
+      <div class="chart"><svg id="hours" viewBox="0 0 760 240" role="img" aria-label="Sesiones de vídeo por hora del día"></svg></div>
+    </div>
+    <div class="sub">
+      <h3>Por barrio</h3>
+      <p>El barrio rural arranca más despacio (0,55 s de media) y su radioenlace de 120 kbps se satura en hora punta. Entre las 18:06 y las 18:18 y entre las 21:20 y las 22:03 se cortan 13 sesiones porque sus segmentos agotan los reintentos.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Barrio</th><th class="n">Usuarios</th><th class="n">Sesiones</th><th class="n">NoRoute</th><th class="n">Cortadas</th><th class="n">Arranque medio</th><th class="n">Bitrate medio</th></tr></thead>
+        <tbody id="barrios"></tbody>
+      </table></div>
+    </div>
+    <div class="sub">
+      <h3>Routers y servidores</h3>
+      <p>La columna NoRoute de los routers de núcleo cuenta los Nack que generan ellos; la de las agregaciones, los que solo reenvían hacia el usuario. Los servidores no generan ninguno. La caché queda fuera de este estudio: se mantiene pequeña y acierta poco.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Nodo</th><th>Papel</th><th class="n">Interests recibidos</th><th class="n">Hit caché</th><th class="n">Nack NoRoute enviados</th></tr></thead>
+        <tbody id="routers"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <section id="noroute">
+    <div class="eyebrow">3 · Iteración 1</div>
+    <h2>Interests sin ruta</h2>
+    <p>En la iteración 1 los routers usan best-route. El 9,2 % de las sesiones de vídeo (284 de 3.078) acaba en <b>Nack NoRoute</b>, y en todas el contenido existe con otro nombre. El Interest sube por la ruta por defecto hasta el núcleo de su ciudad, que no encuentra ningún prefijo y devuelve el Nack. Ya no viaja hasta el servidor, como pasaba en las versiones anteriores.</p>
+    <div class="sub">
+      <h3>Causas</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Causa</th><th class="n">Sesiones</th><th class="n">%</th><th>Nombre pedido (ejemplo)</th><th>Nombre real</th><th class="n">Busca el correcto</th><th>Qué pasa</th></tr></thead>
+        <tbody id="causas"></tbody>
+        <tfoot><tr><td>Total</td><td class="n">284</td><td class="n">100 %</td><td colspan="2">568 Interests (0,08 % del total)</td><td class="n">190 (67 %)</td><td>Tardan 30 s de media en ver lo que querían</td></tr></tfoot>
+      </table></div>
+    </div>
+  </section>
+
+  <section id="iteracion2">
+    <div class="eyebrow">4 · Iteración 2</div>
+    <h2>Redirección por similitud con FastText</h2>
+    <p>En la iteración 2, cuando un router de núcleo no tiene ruta, pregunta al modelo cuál es el nombre válido más parecido. El modelo se entrenó con los logs de los routers de la iteración 1: FastText sobre las componentes de los 2.171 nombres. Si el más parecido llega al umbral y tiene ruta, el router no devuelve un Nack. Contesta con un Data de tipo <b>Link</b>, el mecanismo de redirección de NDN, que lleva el nombre sugerido. El reproductor lo sigue una sola vez y pide ese contenido.</p>
+
+    <div class="ladder"><svg id="ladder" viewBox="0 0 820 270" role="img" aria-label="Diagrama de una redirección"></svg></div>
+
+    <div class="big">
+      <div><b>9,2 % → 0,2 %</b><span>sesiones que acaban en NoRoute (umbral 0,85)</span></div>
+      <div><b>64 %</b><span>de las redirecciones llevan al contenido que quería el usuario</span></div>
+      <div><b>29 %</b><span>de las redirecciones son falsos positivos: otro contenido</span></div>
+      <div><b>30 s → 0,1 s</b><span>hasta ver el contenido, cuando la redirección acierta</span></div>
+    </div>
+
+    <div class="sub">
+      <h3>Tres umbrales</h3>
+      <p>Las tres ejecuciones salen casi iguales: subir el umbral de 0,80 a 0,90 solo quita 7 falsos positivos. Con FastText los falsos positivos tienen una similitud media de 0,957 y los aciertos de 0,964, así que ningún umbral los separa.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Umbral</th><th class="n">Redirigidas</th><th class="n">Acierto</th><th class="n">Mismo título, otro episodio</th><th class="n">Falso positivo</th><th class="n">Siguen en NoRoute</th><th>Reparto</th><th class="n">Ven lo que querían</th></tr></thead>
+        <tbody id="umbrales"></tbody>
+      </table></div>
+      <p class="mono" style="font-size:12.5px;color:var(--muted)">Sobre las 284 sesiones con error de nombre. Ninguna sesión sin error recibió una redirección y ninguna entró en bucle. Los pocos casos restantes son Timeouts en el barrio rural.</p>
+    </div>
+
+    <div class="sub">
+      <h3>Por causa (umbral 0,85)</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Causa</th><th class="n">Sesiones</th><th class="n">Acierto</th><th class="n">Mismo título</th><th class="n">Falso positivo</th><th class="n">NoRoute</th><th>Reparto</th></tr></thead>
+        <tbody id="porcausa"></tbody>
+      </table></div>
+    </div>
+
+    <div class="sub">
+      <h3>Ejemplos reales</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Resultado</th><th>Pidió</th><th>La red le llevó a</th><th>Quería</th><th class="n">Similitud</th></tr></thead>
+        <tbody id="ejemplos"></tbody>
+      </table></div>
+    </div>
+
+    <div class="cols">
+      <div class="note nr">
+        <h3>Por qué falla FastText</h3>
+        <p>El vector de un nombre es la media de los vectores de sus componentes. En <span class="mono">/vod/serie/got/t5/e7/manifest</span> cinco de las seis componentes (<span class="mono">vod serie t5 e7 manifest</span>) las comparte con cualquier otro capítulo 7 de una temporada 5. El título, que es lo que distingue, pesa una sexta parte, y la media acaba dominada por la estructura del nombre. Además FastText aprende de qué componentes aparecen juntas, no de cómo se escriben: <span class="mono">la-casa-de-papel</span> queda cerca de <span class="mono">el-ministerio-del-tiempo</span> porque los dos van detrás de <span class="mono">serie/t1/e1</span>.</p>
+      </div>
+      <div class="note">
+        <h3>Dónde acierta y dónde no</h3>
+        <p>Acierta en los canales renombrados (93 de 105, sin ningún falso positivo), porque el id del vídeo es único y arrastra la coincidencia. También en erratas y mayúsculas de títulos largos (49 de 62). Falla casi siempre en la plataforma equivocada (39 de 42 son falsos positivos) y en la categoría equivocada (9 de 10). Ahí el nombre correcto solo cambia en una componente de estructura (<span class="mono">vod/rtve</span> o <span class="mono">serie/doc</span>), y el modelo prefiere quedarse en la misma plataforma.</p>
+      </div>
+      <div class="note nr">
+        <h3>Balance para el usuario</h3>
+        <p>36 usuarios que en la iteración 1 habrían abandonado ahora ven lo que querían. En cambio, 54 que en la iteración 1 habrían encontrado el nombre correcto ahora acaban en otro contenido. En total ven lo que querían 169 usuarios, frente a 190 en la iteración 1, aunque sin esperar 30 s. El modelo de comportamiento da por buena la redirección; una persona real que recibe otra serie volvería a buscar.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text != null) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const fmt = n => n.toLocaleString("es-ES");
+const dec = (x, d = 1) => x.toFixed(d).replace(".", ",");
+
+// --- Datos: resultados/video_v3 (iteración 1) y video_v3_ft085 (redirecciones)
+const R = { // interests, hit %, noroute enviados, redirecciones (umbral 0,85)
+  "vod-borde": [403973, 0.0, 0], "yt-borde": [70716, 2.7, 0], "rtve-borde": [183538, 0.0, 0],
+  "ix-madrid": [620046, 0.4, 0], "ix-barcelona": [294702, 1.1, 0],
+  "core-mad": [387306, 1.0, 176, 85], "core-bcn": [176442, 2.3, 132, 66], "core-vlc": [123741, 0.6, 96, 45],
+  "core-svq": [114679, 0.4, 84, 40], "core-bio": [114242, 0.2, 80, 39],
+  "agg-mad-1": [98014, 1.1, 84], "agg-mad-2": [82070, 0.3, 92], "agg-bcn-1": [98969, 0.3, 66],
+  "agg-bcn-2": [69384, 0.1, 66], "agg-vlc-1": [66978, 0.5, 50], "agg-vlc-2": [46862, 0.3, 46],
+  "agg-svq-1": [74045, 1.2, 46], "agg-svq-2": [41811, 0.6, 38], "agg-bio-1": [69849, 0.2, 38],
+  "agg-bio-2": [44715, 0.4, 42],
+  "vod-series": [259247, 0, 0], "vod-cine": [116933, 0, 0], "vod-docs": [27793, 0, 0],
+  "yt-canales-a": [29597, 0, 0], "yt-canales-b": [36154, 0, 0], "yt-shorts": [2990, 0, 0],
+  "rtve-play": [149112, 0, 0], "rtve-directo": [34352, 0, 0],
+};
+const B = { // usuarios, sesiones, noroute, cortadas, arranque, bitrate
+  "barrio-mad-1": [80, 535, 42, 0, 0.143, 4180], "barrio-mad-2": [80, 267, 46, 0, 0.248, 5997],
+  "barrio-bcn-1": [70, 407, 33, 0, 0.144, 4867], "barrio-bcn-2": [70, 291, 33, 0, 0.197, 4987],
+  "barrio-vlc-1": [50, 404, 25, 0, 0.124, 4260], "barrio-vlc-2": [50, 311, 23, 0, 0.119, 4198],
+  "barrio-svq-1": [50, 324, 23, 0, 0.102, 4499], "barrio-svq-2": [40, 192, 19, 13, 0.547, 5007],
+  "barrio-bio-1": [45, 150, 19, 0, 0.338, 7768], "barrio-bio-2": [45, 197, 21, 0, 0.154, 4046],
+};
+const SIRVE = {
+  "vod-series": "/vod/serie · 19 series", "vod-cine": "/vod/peli · 30 películas", "vod-docs": "/vod/doc · 6 documentales",
+  "yt-canales-a": "/yt · gaming, música, vlogs, humor, deporte", "yt-canales-b": "/yt · cocina, divulgación, tutoriales, noticias, podcasts",
+  "yt-shorts": "/yt/shorts", "rtve-play": "/rtve/serie y /rtve/doc", "rtve-directo": "/rtve/directo · 5 canales",
+};
+const CITY = { madrid: "Madrid", barcelona: "Barcelona", valencia: "Valencia", sevilla: "Sevilla", bilbao: "Bilbao", dublin: "Dublín", frankfurt: "Fráncfort" };
+
+// nodo: [x, y, tipo, ciudad, caché]
+const N = {
+  "vod-series": [90, 62, "server", "dublin", 1], "vod-cine": [160, 46, "server", "dublin", 1], "vod-docs": [230, 62, "server", "dublin", 1],
+  "vod-borde": [160, 140, "edge", "dublin", 1500],
+  "rtve-play": [440, 54, "server", "madrid", 1], "rtve-directo": [520, 54, "server", "madrid", 1],
+  "rtve-borde": [480, 140, "edge", "madrid", 1500],
+  "yt-canales-a": [730, 62, "server", "frankfurt", 1], "yt-canales-b": [800, 46, "server", "frankfurt", 1], "yt-shorts": [870, 62, "server", "frankfurt", 1],
+  "yt-borde": [800, 140, "edge", "frankfurt", 1500],
+  "ix-madrid": [400, 240, "ix", "madrid", 3000], "ix-barcelona": [700, 240, "ix", "barcelona", 3000],
+  "core-bio": [330, 340, "core", "bilbao", 3000], "core-mad": [400, 455, "core", "madrid", 3000],
+  "core-bcn": [760, 370, "core", "barcelona", 3000], "core-vlc": [640, 525, "core", "valencia", 3000],
+  "core-svq": [220, 625, "core", "sevilla", 3000],
+  "agg-bio-1": [235, 300, "agg", "bilbao", 1500], "barrio-bio-1": [120, 285, "home", "bilbao", 300],
+  "agg-bio-2": [240, 375, "agg", "bilbao", 1500], "barrio-bio-2": [120, 385, "home", "bilbao", 300],
+  "agg-mad-1": [300, 450, "agg", "madrid", 1500], "barrio-mad-1": [185, 460, "home", "madrid", 300],
+  "agg-mad-2": [310, 505, "agg", "madrid", 1500], "barrio-mad-2": [195, 535, "home", "madrid", 300],
+  "agg-bcn-1": [865, 315, "agg", "barcelona", 1500], "barrio-bcn-1": [905, 255, "home", "barcelona", 300],
+  "agg-bcn-2": [865, 425, "agg", "barcelona", 1500], "barrio-bcn-2": [905, 485, "home", "barcelona", 300],
+  "agg-vlc-1": [745, 585, "agg", "valencia", 1500], "barrio-vlc-1": [825, 635, "home", "valencia", 300],
+  "agg-vlc-2": [620, 615, "agg", "valencia", 1500], "barrio-vlc-2": [625, 695, "home", "valencia", 300],
+  "agg-svq-1": [120, 690, "agg", "sevilla", 1500], "barrio-svq-1": [70, 752, "home", "sevilla", 300],
+  "agg-svq-2": [300, 700, "agg", "sevilla", 1500], "barrio-svq-2": [380, 755, "home", "sevilla", 300],
+};
+const L = []; // [a, b, clase]
+for (const s of Object.keys(SIRVE)) L.push([s, s.split("-")[0] + "-borde", "trunk"]);
+L.push(["vod-borde", "ix-madrid", "trunk"], ["yt-borde", "ix-madrid", "trunk"], ["yt-borde", "ix-barcelona", "trunk"],
+  ["rtve-borde", "ix-madrid", "trunk"], ["ix-madrid", "ix-barcelona", "trunk"], ["ix-madrid", "core-mad", "trunk"],
+  ["ix-barcelona", "core-bcn", "trunk"], ["ix-barcelona", "core-vlc", "trunk"], ["core-mad", "core-bcn", "trunk"],
+  ["core-mad", "core-vlc", "trunk"], ["core-mad", "core-svq", "trunk"], ["core-mad", "core-bio", "trunk"],
+  ["core-bcn", "core-vlc", "trunk"], ["core-vlc", "core-svq", "trunk"], ["core-bio", "core-bcn", "trunk"]);
+for (const b of Object.keys(B)) {
+  const a = "agg-" + b.slice(7), c = "core-" + b.split("-")[1];
+  L.push([c, a, "agg"], [a, b, b === "barrio-svq-2" ? "rural" : "access"]);
+}
+const LS = {
+  trunk: { stroke: "var(--core)", w: 3.4, bw: "100 Mbps" }, agg: { stroke: "var(--agg)", w: 2.2, bw: "10 Mbps" },
+  access: { stroke: "var(--home)", w: 1.4, bw: "2,5 Mbps" }, rural: { stroke: "var(--rural)", w: 2, bw: "120 kbps", dash: "5 4" },
+};
+
+const map = document.getElementById("map");
+const grupos = [[40, 18, 245, 150, "vod · Dublín"], [400, 18, 170, 150, "rtve · Madrid"], [690, 18, 225, 150, "yt · Fráncfort"]];
+for (const [x, y, w, h, t] of grupos) {
+  const g = el("g", { class: "grp" }, map);
+  el("rect", { x, y, width: w, height: h, rx: 12 }, g);
+  el("text", { x: x + 10, y: y + h - 10 }, g, t);
+}
+const zr = el("g", {}, map);
+el("rect", { x: 270, y: 675, width: 210, height: 118, rx: 14, fill: "var(--rural-soft)", stroke: "var(--rural)", "stroke-dasharray": "6 4", "stroke-width": 1.5 }, zr);
+el("text", { x: 470, y: 693, "text-anchor": "end", class: "lbl", style: "fill:var(--rural);font-weight:500" }, zr, "ZONA RURAL");
+el("text", { x: 470, y: 707, "text-anchor": "end", class: "lbl-small" }, zr, "radioenlace 120 kbps");
+const CL = { bilbao: [330, 385], madrid: [430, 495], barcelona: [760, 412], valencia: [680, 520], sevilla: [220, 665] };
+for (const [c, [x, y]] of Object.entries(CL)) el("text", { x, y, "text-anchor": c === "valencia" ? "start" : "middle", class: "city" }, map, CITY[c]);
+el("text", { x: 400, y: 214, "text-anchor": "middle", class: "lbl-small" }, map, "Espanix");
+el("text", { x: 700, y: 214, "text-anchor": "middle", class: "lbl-small" }, map, "Catnix");
+
+const linkG = el("g", {}, map);
+for (const [a, b, k] of L) {
+  const s = LS[k], [x1, y1] = N[a], [x2, y2] = N[b];
+  const ln = el("line", { x1, y1, x2, y2, class: "link", stroke: s.stroke, "stroke-width": s.w }, linkG);
+  if (s.dash) ln.setAttribute("stroke-dasharray", s.dash);
+  el("title", {}, ln, `${a} — ${b} · ${s.bw}`);
+}
+for (const [id, [x, y, t]] of Object.entries(N)) if (t === "core") el("circle", { cx: x, cy: y, r: 22, class: "decide" }, map);
+
+const nodeG = el("g", {}, map);
+const nodes = {};
+for (const [id, [x, y, t]] of Object.entries(N)) {
+  const g = el("g", { class: "node", tabindex: 0, role: "button", "aria-label": id }, nodeG);
+  let ly = y + 22, cls = "lbl";
+  if (t === "server") { el("rect", { class: "shape", x: x - 10, y: y - 10, width: 20, height: 20, rx: 3, fill: "var(--origin)", stroke: "var(--surface)", "stroke-width": 2 }, g); ly = y - 15; cls = "lbl-small"; }
+  else if (t === "edge") el("polygon", { class: "shape", points: `${x},${y - 13} ${x + 14},${y} ${x},${y + 13} ${x - 14},${y}`, fill: "var(--origin)", stroke: "var(--surface)", "stroke-width": 2 }, g);
+  else if (t === "ix") { el("circle", { class: "shape", cx: x, cy: y, r: 14, fill: "var(--surface)", stroke: "var(--core)", "stroke-width": 4 }, g); el("circle", { cx: x, cy: y, r: 6, fill: "var(--core)" }, g); ly = y + 30; }
+  else if (t === "core") { el("circle", { class: "shape", cx: x, cy: y, r: 12, fill: "var(--core)", stroke: "var(--surface)", "stroke-width": 2 }, g); ly = y + 36; }
+  else if (t === "agg") { el("circle", { class: "shape", cx: x, cy: y, r: 7, fill: "var(--agg)", stroke: "var(--surface)", "stroke-width": 2 }, g); ly = y + 18; cls = "lbl-small"; }
+  else {
+    const rural = id === "barrio-svq-2";
+    el("rect", { class: "shape", x: x - 21, y: y - 11, width: 42, height: 22, rx: 6, fill: rural ? "var(--rural)" : "var(--home)", stroke: "var(--surface)", "stroke-width": 2 }, g);
+    el("text", { x, y: y + 4, "text-anchor": "middle", class: "lbl", style: "fill:var(--surface);font-weight:500" }, g, B[id][0]);
+  }
+  el("text", { x, y: ly, "text-anchor": "middle", class: cls }, g, t === "server" ? id.split("-").slice(1).join("-") : id);
+  g.addEventListener("click", () => select(id));
+  g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(id); } });
+  nodes[id] = g;
+}
+
+const ROL = { server: "Servidor (producer)", edge: "Borde de plataforma (router)", ix: "Punto neutro (router)", core: "Núcleo (router)", agg: "Agregación (router)", home: "Barrio de hogares (consumer)" };
+const FIB = { server: "sus propios prefijos", edge: "tabla completa", ix: "tabla completa", core: "tabla completa: 356 prefijos", agg: "solo ruta por defecto al núcleo", home: "solo ruta por defecto a su agregación" };
+function select(id) {
+  for (const k in nodes) nodes[k].classList.toggle("sel", k === id);
+  const [, , t, city, cs] = N[id];
+  const links = L.filter(l => l[0] === id || l[1] === id).map(l => `${l[0] === id ? l[1] : l[0]} · ${LS[l[2]].bw}`);
+  let rows = `<dt>Rol</dt><dd>${ROL[t]}</dd><dt>Ciudad</dt><dd>${CITY[city]}</dd><dt>FIB</dt><dd>${FIB[t]}</dd>`;
+  if (SIRVE[id]) rows += `<dt>Sirve</dt><dd>${SIRVE[id]}</dd>`;
+  if (R[id]) {
+    const [i, pct, nr, red] = R[id];
+    rows += `<dt>Interests</dt><dd>${fmt(i)}</dd>`;
+    if (t !== "server") rows += `<dt>Hit caché</dt><dd>${dec(pct)} %</dd><dt>NoRoute enviados</dt><dd>${fmt(nr)}</dd>`;
+    if (red != null) rows += `<dt>Redirecciones (it. 2)</dt><dd>${red}</dd>`;
+  }
+  if (B[id]) {
+    const [u, n, nr, to, a] = B[id];
+    rows += `<dt>Usuarios</dt><dd>${u}</dd><dt>Sesiones</dt><dd>${fmt(n)}</dd><dt>NoRoute</dt><dd>${nr} (${dec(100 * nr / n)} %)</dd>` +
+      (to ? `<dt>Cortadas</dt><dd>${to}</dd>` : "") + `<dt>Arranque medio</dt><dd>${dec(a, 2)} s</dd>`;
+  }
+  const chip = id === "barrio-svq-2" ? `<span class="chip rural">zona rural</span>` : t === "core" ? `<span class="chip nr">decide NoRoute o redirección</span>` : "";
+  document.getElementById("panel").innerHTML =
+    `<div class="eyebrow">Nodo</div><h3 class="mono" style="font-family:var(--mono)">${id}</h3>${chip}<dl>${rows}</dl>` +
+    `<div class="hint"><b>Enlaces</b><br>${links.join("<br>")}</div>`;
+}
+select("core-mad");
+
+// --- Curva horaria
+const H = [123, 46, 23, 19, 9, 20, 16, 31, 49, 116, 85, 56, 122, 135, 217, 183, 145, 88, 115, 235, 287, 397, 393, 168];
+(function () {
+  const s = document.getElementById("hours"), x0 = 44, x1 = 748, y0 = 200, y1 = 20, max = 400;
+  const y = v => y0 - (v / max) * (y0 - y1), bw = (x1 - x0) / 24;
+  const grid = el("g", { class: "grid axis" }, s);
+  for (const v of [0, 100, 200, 300, 400]) {
+    el("line", { x1: x0, x2: x1, y1: y(v), y2: y(v) }, grid);
+    el("text", { x: x0 - 8, y: y(v) + 3, "text-anchor": "end" }, grid, v);
+  }
+  H.forEach((v, i) => {
+    const r = el("rect", { x: x0 + i * bw + 3, y: y(v), width: bw - 6, height: y0 - y(v), rx: 2, fill: i === 21 || i === 22 ? "var(--bar-peak)" : "var(--bar)" }, s);
+    el("title", {}, r, `${i}:00–${i + 1}:00 · ${v} sesiones`);
+    if (i % 3 === 0) el("text", { x: x0 + i * bw + bw / 2, y: y0 + 16, "text-anchor": "middle", style: "font-size:10px;fill:var(--muted)" }, s, `${i} h`);
+  });
+  el("text", { x: x0 + 21 * bw + bw / 2, y: y(397) - 8, "text-anchor": "middle", style: "font-size:11px;font-weight:500;fill:var(--bar-peak)" }, s, "397");
+  el("text", { x: x0 + 4 * bw + bw / 2, y: y(9) - 8, "text-anchor": "middle", style: "font-size:11px;fill:var(--muted)" }, s, "9");
+  el("text", { x: x0, y: 236, style: "font-size:10px;fill:var(--muted)" }, s, "Sesiones de vídeo iniciadas por hora (sin contar miniaturas)");
+})();
+
+// --- Tablas de comportamiento
+document.getElementById("barrios").innerHTML = Object.entries(B).map(([b, [u, n, nr, to, a, br]]) => {
+  const rural = b === "barrio-svq-2";
+  return `<tr${rural ? ' class="flag"' : ""}><td class="mono">${b} ${rural ? '<span class="chip rural">rural · 120 kbps</span>' : ""}</td>` +
+    `<td class="n">${u}</td><td class="n">${n}</td><td class="n">${dec(100 * nr / n)} %</td><td class="n">${to}</td>` +
+    `<td class="n">${dec(a, 2)} s</td><td class="n">${fmt(br)} bit/s</td></tr>`;
+}).join("");
+document.getElementById("routers").innerHTML = Object.entries(R).map(([r, [i, pct, nr]]) => {
+  const t = N[r][2];
+  return `<tr><td class="mono">${r}</td><td>${ROL[t].split(" (")[0]}</td><td class="n">${fmt(i)}</td>` +
+    `<td class="n">${t === "server" ? "—" : dec(pct) + " %"}</td><td class="n">${t === "core" ? `<b>${nr}</b> generados` : nr ? nr + " reenviados" : "0"}</td></tr>`;
+}).join("");
+
+// --- Causas (iteración 1)
+const C = [
+  ["Canal renombrado", 105, "/yt/cocina-y-punto/g72r2WPWoXk", "/yt/cocina-desde-cero/g72r2WPWoXk", 71, "Seis canales cambiaron de nombre; los enlaces de redes siguen con el antiguo."],
+  ["Plataforma equivocada", 47, "/rtve/serie/la-casa-de-papel/t1/e1", "/vod/serie/la-casa-de-papel/t1/e1", 27, "Sabe cómo se llama, pero no dónde está."],
+  ["Nombre aproximado", 38, "/vod/serie/got/t5/e7", "/vod/serie/juego-de-tronos/t5/e7", 28, "Título original, apodo, sin artículo o solo el principio."],
+  ["Enlace mal escrito", 35, "/vod/serie/strnager-things/t2/e4", "/vod/serie/stranger-things/t2/e4", 26, "Letra que falta, sobra o cambia de sitio; guion bajo; plural."],
+  ["Mayúsculas y acentos", 29, "/vod/serie/aqu%C3%AD-no-hay-quien-viva/t5/e3", "/vod/serie/aqui-no-hay-quien-viva/t5/e3", 23, "Lo escribe como se ve en pantalla y la app no lo normaliza."],
+  ["Formato de episodio", 20, "/vod/serie/peaky-blinders/t05/e06", "/vod/serie/peaky-blinders/t5/e6", 8, "Web externa o app antigua con otra convención: t05/e06, s2/e8, 1x02."],
+  ["Categoría equivocada", 10, "/vod/peli/el-dilema-de-las-redes", "/vod/doc/el-dilema-de-las-redes", 7, "Busca el documental entre las películas o las series."],
+];
+document.getElementById("causas").innerHTML = C.map(([c, n, ej, real, rec, txt]) =>
+  `<tr><td><b>${c}</b></td><td class="n">${n}</td><td class="n"><div class="cell-bar"><i style="width:${Math.round(n / 105 * 60)}px"></i>${dec(100 * n / 284)} %</div></td>` +
+  `<td><code>${ej}</code></td><td><code class="want">${real}</code></td><td class="n">${rec} (${Math.round(100 * rec / n)} %)</td><td>${txt}</td></tr>`).join("");
+
+// --- Iteración 2
+function stack(ok, mid, fp, nr, total) {
+  const w = v => `${(100 * v / total).toFixed(1)}%`;
+  return `<div class="stack" role="img" aria-label="acierto ${ok}, mismo título ${mid}, falso positivo ${fp}, NoRoute ${nr}">` +
+    `<i class="s-ok" style="width:${w(ok)}"></i><i class="s-mid" style="width:${w(mid)}"></i><i class="s-fp" style="width:${w(fp)}"></i><i class="s-nr" style="width:${w(nr)}"></i></div>`;
+}
+const U = [ // umbral, redirigidas, acierto, mismo, fp, noroute
+  ["Iteración 1 (best-route)", 0, 0, 0, 0, 284, "190 · a los 30 s"],
+  ["0,80", 265, 168, 19, 78, 5, "168 · al instante"],
+  ["0,85", 265, 169, 18, 78, 7, "169 · al instante"],
+  ["0,90", 250, 168, 11, 71, 22, "168 · al instante"],
+];
+document.getElementById("umbrales").innerHTML = U.map(([u, red, ok, mid, fp, nr, ven]) =>
+  `<tr><td><b>${u}</b></td><td class="n">${red}</td><td class="n cls-ok">${ok}${red ? ` (${Math.round(100 * ok / red)} %)` : ""}</td>` +
+  `<td class="n cls-mid">${mid}</td><td class="n cls-fp">${fp}${red ? ` (${Math.round(100 * fp / red)} %)` : ""}</td><td class="n">${nr}</td>` +
+  `<td>${stack(ok, mid, fp, nr, 284)}</td><td class="n">${ven}</td></tr>`).join("");
+const PC = [ // causa, acierto, mismo, fp, noroute, otro
+  ["Canal renombrado", 93, 12, 0, 0, 0], ["Plataforma equivocada", 2, 1, 39, 0, 0], ["Nombre aproximado", 22, 0, 15, 0, 0],
+  ["Enlace mal escrito", 27, 0, 6, 0, 0], ["Mayúsculas y acentos", 22, 0, 5, 0, 0], ["Formato de episodio", 3, 5, 4, 7, 0],
+  ["Categoría equivocada", 0, 0, 9, 0, 1],
+];
+document.getElementById("porcausa").innerHTML = PC.map(([c, ok, mid, fp, nr, otro]) => {
+  const n = ok + mid + fp + nr + otro;
+  return `<tr><td><b>${c}</b></td><td class="n">${n}</td><td class="n cls-ok">${ok}</td><td class="n cls-mid">${mid}</td><td class="n cls-fp">${fp}</td><td class="n">${nr}</td><td>${stack(ok, mid, fp, nr + otro, n)}</td></tr>`;
+}).join("");
+const EJ = [
+  ["ok", "/vod/serie/strangerthings/t1/e7", "/vod/serie/stranger-things/t1/e7", null, 0.997],
+  ["ok", "/yt/mochileros-de-la-abuela/Sy1hTGAErnv", "/yt/mochilerosdelaabuela/Sy1hTGAErnv", null, 0.962],
+  ["ok", "/rtve/serie/cuentame/t1/e1", "/rtve/serie/cuentame-como-paso/t1/e1", null, 0.998],
+  ["ok", "/rtve/serie/los-simpson/t8/e18", "/vod/serie/los-simpson/t8/e18", null, 0.960],
+  ["mid", "/vod/serie/stranger-things/s2/e8", "/vod/serie/stranger-things/t1/e8", "/vod/serie/stranger-things/t2/e8", 0.942],
+  ["fp", "/vod/serie/got/t5/e7", "/vod/serie/la-que-se-avecina/t5/e7", "/vod/serie/juego-de-tronos/t5/e7", 0.985],
+  ["fp", "/rtve/serie/la-casa-de-papel/t1/e1", "/rtve/serie/el-ministerio-del-tiempo/t1/e1", "/vod/serie/la-casa-de-papel/t1/e1", 0.958],
+  ["fp", "/vod/peli/Coco", "/vod/peli/lo-imposible", "/vod/peli/coco", 0.989],
+  ["fp", "/vod/serie/jugo-de-tronos/t3/e10", "/vod/serie/breaking-bad/t3/e10", "/vod/serie/juego-de-tronos/t3/e10", 0.966],
+];
+const ETQ = { ok: ['<span class="cls-ok">Acierto</span>'], mid: ['<span class="cls-mid">Mismo título</span>'], fp: ['<span class="cls-fp">Falso positivo</span>'] };
+document.getElementById("ejemplos").innerHTML = EJ.map(([k, p, r, q, s]) =>
+  `<tr><td>${ETQ[k]}</td><td><code>${p}</code></td><td><code>${r}</code></td><td>${q ? `<code class="want">${q}</code>` : '<span class="none">lo mismo</span>'}</td><td class="n">${dec(s, 3)}</td></tr>`).join("");
+
+// --- Escalera de una redirección
+(function () {
+  const s = document.getElementById("ladder");
+  const cols = ["reproductor", "barrio-mad-1", "agg-mad-1", "core-mad", "vod-borde · vod-series"];
+  const x = i => 70 + i * 170, yB = 255;
+  cols.forEach((c, i) => {
+    el("text", { x: x(i), y: 18, "text-anchor": "middle", class: "lbl" }, s, c);
+    el("line", { x1: x(i), x2: x(i), y1: 28, y2: yB, stroke: "var(--line)", "stroke-width": 2 }, s);
+  });
+  el("defs", {}, s).innerHTML = ["accent", "noroute", "home"].map(c =>
+    `<marker id="m-${c}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--${c})"/></marker>`).join("");
+  const arrow = (a, b, y, color, label, dy = 12) => {
+    el("line", { x1: x(a) + (b > a ? 4 : -4), y1: y, x2: x(b) + (b > a ? -6 : 6), y2: y + dy, stroke: `var(--${color})`, "stroke-width": 2, "marker-end": `url(#m-${color})` }, s);
+    if (label) el("text", { x: (x(a) + x(b)) / 2, y: y - 4, "text-anchor": "middle", style: `font-size:10px;fill:var(--${color})` }, s, label);
+  };
+  arrow(0, 1, 44, "accent", "Interest /rtve/serie/los-simpson/t8/e18/manifest");
+  arrow(1, 2, 60, "accent", "ruta por defecto");
+  arrow(2, 3, 76, "accent", "ruta por defecto");
+  el("text", { x: x(3) + 10, y: 104, style: "font-size:10px;fill:var(--noroute)" }, s, "sin ruta → el modelo propone");
+  el("text", { x: x(3) + 10, y: 117, style: "font-size:10px;fill:var(--noroute)" }, s, "/vod/serie/los-simpson/… (0,960)");
+  arrow(3, 2, 128, "noroute", "Data Link → /vod/serie/los-simpson/t8/e18/manifest", 10);
+  arrow(2, 1, 142, "noroute", null, 10);
+  arrow(1, 0, 156, "noroute", null, 10);
+  arrow(0, 1, 188, "home", "Interest /vod/serie/los-simpson/t8/e18/manifest");
+  arrow(1, 2, 202, "home");
+  arrow(2, 3, 216, "home");
+  el("text", { x: x(3) + 10, y: 236, style: "font-size:10px;fill:var(--home)" }, s, "con ruta → hacia vod-borde → vod-series");
+  el("text", { x: 8, y: 250, class: "lbl-small" }, s, "El reproductor sigue el enlace y reproduce el capítulo que quería");
+})();
+</script>

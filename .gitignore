@@ -1,0 +1,14 @@
+# Entornos de Python
+venv/
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+
+# ndnSIM (5 GB): se clona y compila, ver README.md
+ndnSIM/
+
+# Datasets de IMDb (776 MB, para uso personal): se descargan, ver README.md
+proyecto/datos/
+
+# Se genera con make
+proyecto/ndnutils/libndnutils.so
