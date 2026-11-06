@@ -30,8 +30,8 @@ Salida (proyecto/modelos/item2vec_<ejecución>[_<router>]/):
     sesiones.txt     una sesión por línea: router, cara y nombres separados por espacios
 
 Ejecutar (desde PrimerExperimento/):
-    ./ndn.sh python3 proyecto/item2vec.py proyecto/resultados/video_v6
-    ./ndn.sh python3 proyecto/item2vec.py proyecto/resultados/video_v6 --router barrio-mad-1
+    ./ndn.sh python3 proyecto/item2vec.py proyecto/resultados/video_v19
+    ./ndn.sh python3 proyecto/item2vec.py proyecto/resultados/video_v19 --router barrio-mad-1
 """
 
 import argparse

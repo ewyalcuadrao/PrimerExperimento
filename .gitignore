@@ -7,8 +7,14 @@ __pycache__/
 # ndnSIM (5 GB): se clona y compila, ver README.md
 ndnSIM/
 
-# Datasets de IMDb (776 MB, para uso personal): se descargan, ver README.md
+# Datasets de IMDb (776 MB, para uso personal) y de YouTube Trending: se descargan, ver README.md
 proyecto/datos/
 
 # Se genera con make
 proyecto/ndnutils/libndnutils.so
+
+# Trazas reales del testbed (otro repo con Git LFS, 1,9 GB): ver https://github.com/tntech-ngin/ndn-traffic-traces
+ndn-traffic-traces/
+
+# Resultados de las simulaciones (cientos de MB o GB cada una): se generan con red_video.py
+proyecto/resultados/

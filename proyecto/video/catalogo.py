@@ -8,8 +8,9 @@ Tres plataformas, cada una con su servidor de origen:
 Los títulos son reales. Los de /vod salen de los datasets públicos de IMDb
 (catalogo_imdb.json, generado con importar_imdb.py): título en España, títulos
 alternativos como alias, temporadas y episodios reales, duración, géneros y votos
-como popularidad. Los de RTVE son una lista a mano. Los canales de /yt son
-inventados (no corresponden a personas reales).
+como popularidad. Los de RTVE son una lista a mano. Los canales de /yt, sus vídeos
+y los shorts salen del dataset Trending YouTube Video Statistics de México
+(catalogo_youtube.json, generado con importar_youtube.py).
 
 Nombres NDN de cada contenido (cada uno es un solo Data; el servidor sirve también
 <prefijo>/miniatura):
@@ -20,8 +21,8 @@ Nombres NDN de cada contenido (cada uno es un solo Data; el servidor sirve tambi
     /rtve/serie/<slug>/t<temporada>/e<episodio>
     /rtve/doc/<slug>/t<temporada>/e<episodio>
     /rtve/directo/<canal>
-    /yt/<canal>/<id de vídeo>
-    /yt/shorts/<id de vídeo>
+    /yt/<canal>/<título del vídeo>
+    /yt/shorts/<título del vídeo>
 
 Cada temporada (o película, o canal) es una aplicación del servidor de origen. Todo
 el catálogo está publicado: un nombre recibe Nack NoRoute (en el origen, que sí
@@ -206,62 +207,32 @@ PARRILLA = [
 ]
 
 # ---------- Canales de vídeo de usuarios (/yt) ----------
-# Temáticas a partir de las categorías de vídeo de la API de YouTube (Gaming, Music,
-# Sports, Autos & Vehicles, Pets & Animals, Travel & Events, Howto & Style, Education,
-# Science & Technology, Comedy, News & Politics, Film & Animation, People & Blogs),
-# desdobladas en las que más se ven en España.
-# (temática, minutos medianos de un vídeo, peso por edad, palabras para el nombre del canal)
-TEMATICAS = [
-    ("gaming", 22, (2.5, 1.0, 0.2, 0.1), ["gameplays", "partidas", "speedruns", "retro", "minecraft",
-                                          "fortnite", "rol", "indies"]),
-    ("cocina", 12, (0.6, 1.4, 1.6, 1.2), ["recetas", "cocina", "reposteria", "tapas", "guisos",
-                                          "panaderia", "cocina-vegana", "barbacoa"]),
-    ("musica", 4, (2.0, 1.2, 0.8, 0.6), ["videoclips", "directos", "acusticos", "versiones", "flamenco",
-                                         "reggaeton", "rock", "karaoke"]),
-    ("divulgacion", 15, (1.2, 1.2, 1.0, 0.7), ["ciencia", "historia", "astronomia", "filosofia",
-                                               "biologia", "matematicas", "geografia", "arqueologia"]),
-    ("deporte", 8, (1.4, 1.4, 1.0, 0.6), ["resumenes", "goles", "baloncesto", "ciclismo", "tenis",
-                                          "padel", "running", "formula-1"]),
-    ("tutoriales", 12, (1.3, 1.4, 0.8, 0.4), ["tutoriales", "bricolaje", "informatica", "linux",
-                                              "excel", "programacion", "fotografia", "reparaciones"]),
-    ("vlogs", 15, (2.0, 0.8, 0.3, 0.1), ["vlogs", "rutinas", "vida-diaria", "familia", "estudiantes",
-                                         "erasmus", "mudanzas", "retos"]),
-    ("humor", 6, (1.8, 1.0, 0.6, 0.4), ["sketches", "monologos", "parodias", "bromas", "doblajes",
-                                        "memes", "imitaciones", "chistes"]),
-    ("noticias", 5, (0.5, 1.0, 1.5, 1.6), ["actualidad", "economia", "politica", "tertulias",
-                                           "internacional", "analisis", "sucesos", "opinion"]),
-    ("podcasts", 60, (1.2, 1.4, 0.8, 0.3), ["podcast", "entrevistas", "charlas", "conversaciones",
-                                            "true-crime", "misterio", "debates", "historias"]),
-    ("motor", 14, (1.4, 1.5, 1.0, 0.4), ["coches", "motos", "pruebas", "mecanica", "clasicos",
-                                         "electricos", "rally", "camiones"]),
-    ("mascotas", 6, (1.2, 1.3, 1.2, 1.0), ["perros", "gatos", "animales", "adiestramiento",
-                                           "acuarios", "aves", "granja", "fauna"]),
-    ("viajes", 16, (1.4, 1.2, 1.0, 0.7), ["viajes", "mochileros", "rutas", "escapadas", "furgoneta",
-                                          "pueblos", "camping", "senderismo"]),
-    ("belleza", 10, (2.0, 1.2, 0.5, 0.2), ["maquillaje", "moda", "peinados", "cuidado-de-la-piel",
-                                           "estilo", "unas", "perfumes", "outfits"]),
-    ("fitness", 20, (1.8, 1.4, 0.7, 0.3), ["fitness", "yoga", "pilates", "gimnasio", "estiramientos",
-                                           "calistenia", "nutricion", "crossfit"]),
-    ("tecnologia", 12, (1.6, 1.4, 0.6, 0.3), ["moviles", "unboxing", "gadgets", "analisis-tech",
-                                              "ordenadores", "domotica", "inteligencia-artificial",
-                                              "consolas"]),
-    ("cine", 14, (1.6, 1.3, 0.8, 0.4), ["resenas", "criticas", "trailers", "curiosidades-de-cine",
-                                        "series", "anime", "comics", "teorias"]),
-    ("finanzas", 15, (1.2, 1.5, 1.0, 0.5), ["finanzas", "inversion", "ahorro", "bolsa", "cripto",
-                                            "emprendedores", "hipotecas", "impuestos"]),
-    ("educacion", 12, (1.6, 1.0, 0.6, 0.4), ["idiomas", "ingles", "oposiciones", "selectividad",
-                                             "lengua", "fisica", "quimica", "dibujo"]),
-    ("hogar", 10, (0.5, 1.4, 1.6, 1.3), ["jardineria", "huerto", "manualidades", "decoracion",
-                                         "limpieza", "costura", "ganchillo", "plantas"]),
-]
-COMPLEMENTOS = ["del-norte", "de-barrio", "en-5-minutos", "sin-filtros", "para-todos", "a-fondo",
-                "de-la-abuela", "express", "en-casa", "de-madrugada", "con-calma", "low-cost",
-                "desde-cero", "y-punto", "al-dia", "de-bolsillo", "del-sur", "con-ana", "con-pablo",
-                "para-dummies", "facil", "en-espanol", "pro", "de-verdad", "hoy", "y-mas",
-                "de-andalucia", "de-galicia", "made-in-spain", "sin-rodeos", "a-lo-grande", "en-vivo"]
-CANALES_POR_TEMATICA = 25
+# Canales y títulos reales del dataset Trending YouTube Video Statistics de México
+# (catalogo_youtube.json, ver importar_youtube.py). La temática es la categoría de
+# YouTube del canal.
+# temática -> (minutos medianos de un vídeo, peso por edad)
+TEMATICAS = {
+    "entretenimiento": (14, (1.6, 1.3, 0.9, 0.6)),
+    "vlogs": (15, (2.0, 0.8, 0.3, 0.1)),
+    "deporte": (8, (1.4, 1.4, 1.0, 0.6)),
+    "noticias": (5, (0.5, 1.0, 1.5, 1.6)),
+    "tutoriales": (12, (1.3, 1.4, 0.8, 0.4)),
+    "musica": (4, (2.0, 1.2, 0.8, 0.6)),
+    "humor": (6, (1.8, 1.0, 0.6, 0.4)),
+    "cine": (14, (1.6, 1.3, 0.8, 0.4)),
+    "gaming": (22, (2.5, 1.0, 0.2, 0.1)),
+    "educacion": (12, (1.6, 1.0, 0.6, 0.4)),
+    "tecnologia": (12, (1.6, 1.4, 0.6, 0.3)),
+    "motor": (14, (1.4, 1.5, 1.0, 0.4)),
+    "viajes": (16, (1.4, 1.2, 1.0, 0.7)),
+    "mascotas": (6, (1.2, 1.3, 1.2, 1.0)),
+}
 CANALES_RENOMBRADOS = 15  # canales que cambiaron de nombre; en redes siguen enlazados con el antiguo
-ALFABETO_ID = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+SUFIJOS = ["oficial", "tv", "mx", "channel", "official", "videos", "2"]
+_YT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalogo_youtube.json")
+with open(_YT, encoding="utf-8") as f:
+    _CATALOGO_YT = json.load(f)
+SHORTS = _CATALOGO_YT["shorts"]  # nombres de los shorts, del más visto al menos
 
 
 @dataclass
@@ -271,29 +242,21 @@ class Canal:
     minutos: float
     afinidad: tuple
     popularidad: float
-    videos: list           # ids, del más reciente al más antiguo
+    videos: list           # títulos, del más reciente al más antiguo
     antiguo: str = ""      # nombre anterior, si el canal se renombró
 
 
-def id_video(rng):
-    return "".join(rng.choice(ALFABETO_ID) for _ in range(11))
-
-
 def canales(seed=7):
-    """Canales inventados con sus vídeos; deterministas para una semilla."""
+    """Canales del dataset con sus vídeos; los renombrados, deterministas para una semilla."""
     rng = random.Random(seed)
-    resultado, usados = [], set()
-    for tematica, minutos, afinidad, palabras in TEMATICAS:
-        for _ in range(CANALES_POR_TEMATICA):
-            while True:
-                slug = f"{rng.choice(palabras)}-{rng.choice(COMPLEMENTOS)}"
-                if slug not in usados:
-                    usados.add(slug)
-                    break
-            n = int(rng.lognormvariate(4.3, 0.8)) + 10       # ~75 vídeos de mediana
-            popularidad = rng.paretovariate(1.2)               # pocos canales muy grandes
-            resultado.append(Canal(slug, tematica, minutos, afinidad, popularidad,
-                                   [id_video(rng) for _ in range(n)]))
+    visitas = sorted(c["visitas"] for c in _CATALOGO_YT["canales"])
+    mediana = visitas[len(visitas) // 2]
+    resultado = []
+    for c in _CATALOGO_YT["canales"]:
+        minutos, afinidad = TEMATICAS[c["tematica"]]
+        resultado.append(Canal(c["slug"], c["tematica"], minutos, afinidad, c["visitas"] / mediana,
+                               list(c["videos"])))
+    usados = {c.slug for c in resultado}
     for canal in rng.sample(resultado, CANALES_RENOMBRADOS):
         canal.antiguo = canal.slug
         canal.slug = renombrar(rng, canal.slug, usados)
@@ -303,10 +266,10 @@ def canales(seed=7):
 
 def renombrar(rng, slug, usados):
     """Nombre nuevo de un canal, como los cambios de nombre reales: añadir un sufijo,
-    juntar las palabras o cambiar el complemento."""
-    palabra = slug.split("-")[0]
+    juntar las palabras o quitar la última."""
+    palabras = slug.split("-")
     while True:
-        nuevo = rng.choice([slug + "-oficial", slug + "-tv", slug.replace("-", ""),
-                            f"{palabra}-{rng.choice(COMPLEMENTOS)}"])
+        nuevo = rng.choice([f"{slug}-{rng.choice(SUFIJOS)}", slug.replace("-", ""),
+                            "-".join(palabras[:-1]) if len(palabras) > 1 else f"{slug}-{rng.choice(SUFIJOS)}"])
         if nuevo not in usados:
             return nuevo

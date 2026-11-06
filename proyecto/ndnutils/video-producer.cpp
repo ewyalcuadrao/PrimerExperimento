@@ -1,22 +1,13 @@
-// Servidor de vídeo: responde cada contenido con un solo Data.
-//
-// Nombres que atiende (bajo su prefijo, p. ej. /vod/serie/dark/t1):
-//   .../e<N>, /vod/peli/<slug>...  el vídeo entero, en un Data de VIDEO bytes
-//   .../miniatura                  imagen de portada, en un Data de MINIATURA bytes
-// Un canal en directo (/rtve/directo/<canal>) es también un solo nombre y un solo Data.
-// Los tamaños no son los reales (un episodio son cientos de MB): basta con que un
-// vídeo pese más que una miniatura y quepa en un paquete NDN.
+// Servidor de vídeo: responde el manifiesto, los segmentos y las miniaturas de los
+// contenidos bajo su prefijo (p. ej. /vod/serie/dark/t1). Formato de los nombres y
+// tamaños en video-common.hpp.
+
+#include "video-common.hpp"
 
 #include <ns3/core-module.h>
 #include <ns3/ndnSIM/apps/ndn-app.hpp>
 #include <ns3/ndnSIM/helper/ndn-fib-helper.hpp>
-
-namespace {
-
-const size_t VIDEO = 6000;     // bytes del Data de un vídeo
-const size_t MINIATURA = 2000; // bytes del Data de una miniatura
-
-} // namespace
+#include <sstream>
 
 namespace ns3 {
 namespace ndn {
@@ -32,7 +23,14 @@ public:
         .SetParent<App>()
         .AddConstructor<VideoProducer>()
         .AddAttribute("Prefix", "Prefijo que sirve", StringValue("/"),
-                      MakeStringAccessor(&VideoProducer::m_prefix), MakeStringChecker());
+                      MakeStringAccessor(&VideoProducer::m_prefix), MakeStringChecker())
+        .AddAttribute("Directo", "Emite en directo (el manifiesto cambia con cada segmento)",
+                      BooleanValue(false), MakeBooleanAccessor(&VideoProducer::m_directo),
+                      MakeBooleanChecker())
+        .AddAttribute("Nombres", "Contenidos bajo el prefijo, separados por espacios; si se dan, "
+                      "solo se anuncian esos (otro nombre bajo el prefijo da NoRoute)",
+                      StringValue(""), MakeStringAccessor(&VideoProducer::m_nombres),
+                      MakeStringChecker());
     return tid;
   }
 
@@ -41,7 +39,14 @@ protected:
   StartApplication() override
   {
     App::StartApplication();
-    FibHelper::AddRoute(GetNode(), Name(m_prefix), m_face, 0);
+    if (m_nombres.empty()) {
+      FibHelper::AddRoute(GetNode(), Name(m_prefix), m_face, 0);
+      return;
+    }
+    std::istringstream nombres(m_nombres);
+    std::string nombre;
+    while (nombres >> nombre)
+      FibHelper::AddRoute(GetNode(), Name(m_prefix).append(nombre), m_face, 0);
   }
 
   void
@@ -57,9 +62,20 @@ private:
   Responder(const Name& name)
   {
     auto data = make_shared<Data>(name);
-    data->setFreshnessPeriod(::ndn::time::hours(1));
-    bool miniatura = !name.empty() && name[-1].toUri() == "miniatura";
-    data->setContent(make_shared< ::ndn::Buffer>(miniatura ? MINIATURA : VIDEO));
+    std::size_t bytes = video::MANIFIESTO;
+    ::ndn::time::milliseconds frescura = ::ndn::time::hours(1);
+    if (!name.empty() && name[-1].isSegment() && name.size() >= 2) {
+      int q = video::indiceCalidad(name[-2].toUri());
+      bytes = video::bytesSegmento(q >= 0 ? q : 0);
+    }
+    else if (!name.empty() && name[-1].toUri() == "miniatura") {
+      bytes = video::MINIATURA;
+    }
+    else if (m_directo) {
+      frescura = ::ndn::time::seconds(static_cast<int>(video::SEGMENTO)); // manifiesto de un directo
+    }
+    data->setFreshnessPeriod(frescura);
+    data->setContent(make_shared< ::ndn::Buffer>(bytes));
     data->setSignatureInfo(SignatureInfo(static_cast< ::ndn::tlv::SignatureTypeValue>(255)));
     ::ndn::EncodingEstimator estimator;
     ::ndn::EncodingBuffer encoder(estimator.appendVarNumber(0), 0);
@@ -71,7 +87,8 @@ private:
     m_appLink->onReceiveData(*data);
   }
 
-  std::string m_prefix;
+  std::string m_prefix, m_nombres;
+  bool m_directo = false;
 };
 
 NS_OBJECT_ENSURE_REGISTERED(VideoProducer);

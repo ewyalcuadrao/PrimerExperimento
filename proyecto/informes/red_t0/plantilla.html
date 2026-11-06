@@ -1,0 +1,302 @@
+<title>Red de vídeo en t = 0</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: mapa de la red arriba, ficha del nodo elegido debajo con pestañas Interests / Data */
+:root {
+  --bg: #f5f7f8; --panel: #ffffff; --fg: #18232b; --muted: #5b6b76; --line: #d5dde2; --soft: #e9eef1;
+  --prod: #b4651b; --router: #3d6a8a; --cons: #24806f; --sel: #c2410c; --err: #b42318; --err-bg: #fdecea;
+  --edge: #9fb0bb; --edge-fast: #6f8796;
+  --display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f161b; --panel: #162028; --fg: #e3eaee; --muted: #93a4ae; --line: #2a3843; --soft: #1d2a33;
+  --prod: #e19a52; --router: #7fb0d4; --cons: #5cc2ad; --sel: #fb923c; --err: #f58a7e; --err-bg: #3a1f1d;
+  --edge: #3e505c; --edge-fast: #5d7584; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f161b; --panel: #162028; --fg: #e3eaee; --muted: #93a4ae; --line: #2a3843; --soft: #1d2a33;
+  --prod: #e19a52; --router: #7fb0d4; --cons: #5cc2ad; --sel: #fb923c; --err: #f58a7e; --err-bg: #3a1f1d;
+  --edge: #3e505c; --edge-fast: #5d7584; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 20px; }
+h1 { font: 700 1.9rem/1.1 var(--display); margin: 0; text-wrap: balance; letter-spacing: .01em; }
+h2 { font: 700 1.45rem/1.15 var(--display); margin: 0; text-wrap: balance; }
+.intro { display: grid; gap: 6px; }
+.intro p { margin: 0; color: var(--muted); max-width: 68ch; }
+.mono { font-family: var(--mono); font-size: .86em; }
+.mapa { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+.mapa svg { display: block; width: 100%; min-width: 760px; height: auto; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 10px 14px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: .88rem; min-width: 760px; }
+.leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.edge { stroke: var(--edge); stroke-width: 1.4; }
+.edge.troncal { stroke: var(--edge-fast); stroke-width: 2.4; }
+.edge.lenta { stroke-dasharray: 4 3; }
+.edge.vecino { stroke: var(--sel); stroke-width: 2.6; }
+.nodo { cursor: pointer; outline: none; }
+.nodo .forma { stroke: var(--panel); stroke-width: 2; }
+.nodo text { font: 500 11px var(--body); fill: var(--fg); text-anchor: middle; pointer-events: none; }
+.nodo:hover .forma, .nodo:focus-visible .forma { stroke: var(--fg); }
+.nodo.sel .forma { stroke: var(--sel); stroke-width: 3.5; }
+.nodo.sel text { font-weight: 600; }
+.ficha { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.cabecera { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.rol { font: 600 .74rem var(--body); text-transform: uppercase; letter-spacing: .08em; padding: 2px 8px; border-radius: 99px; color: var(--panel); }
+.datos { display: flex; flex-wrap: wrap; gap: 6px 22px; color: var(--muted); font-size: .9rem; }
+.datos b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.vecinos { display: flex; flex-wrap: wrap; gap: 6px; }
+.vecinos button { font: 500 .82rem var(--body); background: var(--soft); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+.vecinos button:hover, .vecinos button:focus-visible { border-color: var(--sel); outline: none; }
+.vecinos small { color: var(--muted); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs button { font: 600 1rem var(--display); letter-spacing: .02em; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--muted); padding: 6px 12px; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--sel); }
+.tabs button:focus-visible { outline: 2px solid var(--sel); outline-offset: 2px; }
+.estado { margin: 0; padding: 10px 12px; background: var(--soft); border-radius: 8px; max-width: 80ch; }
+.filtros { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.filtros input[type=search], .filtros select { font: inherit; font-size: .9rem; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); }
+.filtros input[type=search] { min-width: 0; flex: 1 1 220px; }
+.filtros label { display: inline-flex; gap: 6px; align-items: center; font-size: .9rem; color: var(--muted); }
+.cuenta { font-size: .88rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tabla { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: .86rem; }
+th { text-align: left; font: 600 .74rem var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--soft); padding: 7px 10px; position: sticky; top: 0; }
+td { padding: 6px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.nombre { font-family: var(--mono); font-size: .8rem; word-break: break-all; min-width: 220px; }
+tr.error td { background: var(--err-bg); }
+.etq { display: inline-block; font-size: .74rem; padding: 1px 7px; border-radius: 99px; background: var(--soft); border: 1px solid var(--line); white-space: nowrap; }
+.etq.err { color: var(--err); border-color: var(--err); background: transparent; }
+.nota { font-size: .84rem; color: var(--muted); margin: 0; }
+.mas { justify-self: start; font: 600 .9rem var(--body); background: none; border: 1px solid var(--line); color: var(--fg); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+.mas:focus-visible { outline: 2px solid var(--sel); }
+h3 { font: 700 1.05rem var(--display); margin: 6px 0 0; }
+@media (prefers-reduced-motion: no-preference) { .nodo .forma { transition: stroke .15s; } }
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <h1>Red de vídeo en t = 0</h1>
+    <p>Escenario <span class="mono">__ESCENARIO__</span>: 38 nodos y 10 consumidores, cada uno la máquina de un solo usuario; __PERIODO__, vídeo por segmentos de 4 s en cinco calidades. <span id="modo"></span>Pulsa un nodo para ver qué Interests y qué Data tiene al empezar la simulación. Los nombres vienen del catálogo construido con IMDb, la lista de RTVE y, en <span class="mono">/yt</span>, los canales y títulos reales del dataset Trending YouTube de México.</p>
+  </header>
+
+  <section class="mapa" aria-label="Mapa de la red">
+    <svg id="svg" viewBox="0 0 1000 540" role="img" aria-label="Topología: productores arriba, barrios abajo"></svg>
+    <div class="leyenda">
+      <span><i class="dot" style="background:var(--prod)"></i>Productor</span>
+      <span><i class="dot" style="background:var(--router)"></i>Router</span>
+      <span><i class="dot" style="background:var(--cons)"></i>Casa de un usuario (nodos barrio-*)</span>
+      <span>Línea gruesa: enlace de 100 Mb/s · discontinua: radioenlace rural de 100 kb/s</span>
+    </div>
+  </section>
+
+  <section class="ficha" id="ficha" aria-live="polite"></section>
+</div>
+
+<script id="datos" type="application/json">__DATOS__</script>
+<script>
+const D = JSON.parse(document.getElementById("datos").textContent);
+const COLOR = { producer: "var(--prod)", router: "var(--router)", consumer: "var(--cons)" };
+const ROL = { producer: "Productor", router: "Router", consumer: "Casa" };
+const esBarrio = n => false; // cada barrio es una casa
+const esCasa = n => n.startsWith("casa-");
+const POS = {
+  "vod-series": [60, 40], "vod-cine": [135, 40], "vod-docs": [210, 40],
+  "yt-canales-a": [420, 40], "yt-canales-b": [495, 40], "yt-shorts": [570, 40],
+  "rtve-play": [790, 40], "rtve-directo": [870, 40],
+  "vod-borde": [135, 135], "yt-borde": [495, 135], "rtve-borde": [830, 135],
+  "ix-madrid": [300, 225], "ix-barcelona": [560, 225],
+  "core-mad": [100, 320], "core-bcn": [300, 320], "core-vlc": [500, 320], "core-svq": [700, 320], "core-bio": [900, 320],
+};
+["mad", "bcn", "vlc", "svq", "bio"].forEach((c, i) => [1, 2].forEach(k => {
+  const x = 50 + i * 200 + (k - 1) * 100;
+  POS[`agg-${c}-${k}`] = [x, 405]; POS[`barrio-${c}-${k}`] = [x, 490];
+}));
+const CIUDAD = { madrid: "Madrid", barcelona: "Barcelona", valencia: "Valencia", sevilla: "Sevilla", bilbao: "Bilbao", dublin: "Dublín", frankfurt: "Fráncfort" };
+const CAT = { miniatura: "miniatura", serie: "episodio", peli: "película", doc: "documental", youtube: "YouTube", shorts: "short", directo: "directo" };
+const CAUSA = { canal_renombrado: "canal renombrado", enlace_mal_escrito: "enlace mal escrito", plataforma_equivocada: "plataforma equivocada",
+  nombre_aproximado: "nombre aproximado", formato_episodio: "formato de episodio", mayusculas_acentos: "mayúsculas o acentos", categoria_equivocada: "categoría equivocada" };
+if (D.logs) document.getElementById("modo").innerHTML = "Sin simular la red: cada episodio dura 1 ms y solo hay logs de las casas, sus capturas. La topología es la de la simulación. ";
+const fmt = n => n.toLocaleString("es-ES");
+const hora = s => s >= 86400 ? `día ${Math.floor(s / 86400) + 1}, ${hora1(s % 86400)}` : hora1(s);
+const hora1 = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${x.toFixed(x % 1 ? 3 : 0).padStart(2, "0")}`; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const vecinos = {};
+D.enlaces.forEach(([a, b, bw, d]) => { (vecinos[a] ||= []).push([b, bw, d]); (vecinos[b] ||= []).push([a, bw, d]); });
+const barrioDe = {};
+D.enlaces.forEach(([a, b]) => { if (esCasa(b)) barrioDe[b] = a; });
+const casasDe = n => (vecinos[n] || []).filter(([v]) => esCasa(v)).map(([v]) => v);
+
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("svg");
+const mk = (tag, attrs, parent) => { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); parent.appendChild(el); return el; };
+const gEdges = mk("g", {}, svg), gNodes = mk("g", {}, svg);
+const lineas = D.enlaces.filter(([a, b]) => POS[a] && POS[b]).map(([a, b, bw, d]) => {
+  const [x1, y1] = POS[a], [x2, y2] = POS[b];
+  const l = mk("line", { x1, y1, x2, y2, class: "edge" + (bw === "100Mbps" ? " troncal" : "") + (bw === "100Kbps" ? " lenta" : "") }, gEdges);
+  mk("title", {}, l).textContent = `${a} — ${b}: ${bw.replace("bps", " b/s")}, ${d}`;
+  return { a, b, l };
+});
+const grupos = {};
+for (const [n, info] of Object.entries(D.nodos)) {
+  if (!POS[n]) continue; // las casas se ven desde su barrio
+  const [x, y] = POS[n];
+  const g = mk("g", { class: "nodo", tabindex: 0, role: "button", "aria-label": `${n}, ${ROL[info.rol]}` }, gNodes);
+  const forma = esBarrio(n) ? "consumer" : info.rol;
+  if (forma === "producer") mk("rect", { x: x - 13, y: y - 13, width: 26, height: 26, rx: 4, class: "forma", fill: COLOR.producer }, g);
+  else if (forma === "consumer") mk("path", { d: `M${x - 15} ${y + 11} V${y - 3} L${x} ${y - 15} L${x + 15} ${y - 3} V${y + 11} Z`, class: "forma", fill: COLOR.consumer }, g);
+  else mk("circle", { cx: x, cy: y, r: n.startsWith("core") || n.startsWith("ix") ? 14 : 11, class: "forma", fill: COLOR.router }, g);
+  const t = mk("text", { x, y: y + 30 }, g);
+  t.textContent = n.replace("barrio-", "").replace("yt-canales-", "yt-");
+  if (n.startsWith("barrio")) t.textContent = n;
+  g.addEventListener("click", () => elegir(n));
+  g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); elegir(n); } });
+  grupos[n] = g;
+}
+
+const ficha = document.getElementById("ficha");
+let actual = null, pestana = "interests";
+
+function elegir(n) {
+  actual = n;
+  const enMapa = esCasa(n) ? barrioDe[n] : n;
+  for (const [k, g] of Object.entries(grupos)) g.classList.toggle("sel", k === enMapa);
+  lineas.forEach(({ a, b, l }) => l.classList.toggle("vecino", a === enMapa || b === enMapa));
+  try { localStorage.setItem("nodo", n); } catch (e) {}
+  pintar();
+}
+
+function pintar() {
+  const n = actual, info = D.nodos[n];
+  const extra = esBarrio(n) ? `<span>Casas <b>${fmt(casasDe(n).length)}</b></span>` :
+    info.rol === "producer" ? `<span>Prefijos anunciados <b>${fmt((D.prod[n] || []).length)}</b></span>` : "";
+  ficha.innerHTML = `
+    <div class="cabecera"><h2 class="mono" style="font-family:var(--mono);font-size:1.25rem">${n}</h2>
+      <span class="rol" style="background:${COLOR[info.rol]}">${ROL[info.rol]}</span></div>
+    <div class="datos"><span>Ciudad <b>${CIUDAD[info.ciudad] || info.ciudad}</b></span>
+      <span>Caché (CS) <b>${fmt(info.cs)} paquetes</b></span>${extra}</div>
+    <div class="vecinos">${(vecinos[n] || []).filter(([v]) => !esCasa(v) || esCasa(n)).map(([v, bw, d]) => `<button type="button" data-v="${v}">${v} <small>${bw.replace("bps", "b/s")} · ${d}</small></button>`).join("")}</div>
+    ${esBarrio(n) ? `<div style="display:grid;gap:6px"><span class="nota">Casas de este barrio (enlace ${esc((vecinos[n].find(([v]) => esCasa(v)) || ["", ""])[1].replace("bps", "b/s"))} cada una):</span>
+      <div class="vecinos">${casasDe(n).map(v => `<button type="button" data-v="${v}">${v.replace("casa-", "")}</button>`).join("")}</div></div>` : ""}
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-interests" aria-selected="${pestana === "interests"}">Interests</button>
+      <button type="button" role="tab" id="tab-data" aria-selected="${pestana === "data"}">Data</button>
+    </div>
+    <div id="contenido" role="tabpanel"></div>`;
+  ficha.querySelectorAll(".vecinos button[data-v]").forEach(b => b.addEventListener("click", () => elegir(b.dataset.v)));
+  ficha.querySelector("#tab-interests").addEventListener("click", () => { pestana = "interests"; pintar(); });
+  ficha.querySelector("#tab-data").addEventListener("click", () => { pestana = "data"; pintar(); });
+  const c = ficha.querySelector("#contenido");
+  if (pestana === "interests") interests(n, info, c); else data(n, info, c);
+}
+
+function primerLog(n, tipo) {
+  const filas = (D.log[n] || []).filter(r => r[2] === tipo);
+  if (D.logs && !D.log[n]) return `<p class="nota">En estos logs no se simula la red: solo hay capturas en las casas, así que este nodo no tiene log.</p>`;
+  if (D.logs && tipo === "Data") return `<p class="nota">La captura de la casa solo guarda los Interest que salen; los Data que recibiría no están.</p>`;
+  if (!filas.length) return `<p class="nota">No aparece ningún ${tipo} de contenido en los primeros paquetes del log de este nodo.</p>`;
+  return `<h3>Primeros ${tipo} del log</h3>
+    <p class="nota">Lo que pasa después de t = 0: ${D.logs ? `las primeras ${filas.length} tramas de su captura, decodificadas en <span class="mono">interests/${n}.csv</span>; origen y destino son las MAC de la casa y de su router` : `los primeros ${filas.length} paquetes ${tipo} de contenido de <span class="mono">paquetes.csv</span>, sin el tráfico interno <span class="mono">/localhost</span>`}.</p>
+    <div class="tabla"><table><thead><tr><th>Tiempo</th><th>Sentido</th><th>De → a</th><th>Nombre</th><th>Bytes</th></tr></thead><tbody>
+    ${filas.map(r => `<tr><td class="num">${hora(r[0])}</td><td>${r[1] === "in" ? "entra" : "sale"}</td><td class="mono">${esc(r[3] || "—")} → ${esc(r[4] || "—")}</td><td class="nombre">${esc(r[5])}</td><td class="num">${fmt(r[6])}</td></tr>`).join("")}
+    </tbody></table></div>`;
+}
+
+function segs(r) {
+  if (r[6] === undefined) return "";
+  if (D.logs) return `<br><span style="color:var(--muted)">+ ${r[1] && r[8] === "240p" ? "240p" : "480p"}/seg=0, el único segmento</span>`;
+  const desde = r[3] === "directo" ? "desde el que se emite a esa hora" : `seg=${r[6]} … seg=${r[6] + r[7] - 1}`;
+  return `<br><span style="color:var(--muted)">+ ${fmt(r[7])} segmentos, ${desde}, hasta ${r[8]}</span>`;
+}
+
+function interests(n, info, c) {
+  if (info.rol !== "consumer") {
+    const primero = (D.log[n] || []).find(r => r[2] === "Interest");
+    if (esBarrio(n)) {
+      c.innerHTML = `<div style="display:grid;gap:12px;padding-top:12px">
+        <p class="estado">El barrio es el router de acceso de sus <b>${fmt(casasDe(n).length)}</b> casas: en t = 0 no tiene ningún Interest, solo reenvía hacia arriba lo que piden ellas. Pulsa una casa para ver lo que tiene programado.${primero ? ` El primer Interest le llega a las <b>${hora(primero[0])}</b>.` : ""}</p>
+        ${primerLog(n, "Interest")}</div>`;
+      return;
+    }
+    c.innerHTML = `<div style="display:grid;gap:12px;padding-top:12px">
+      <p class="estado">En t = 0 este ${info.rol === "producer" ? "productor" : "router"} no tiene ningún Interest: la PIT está vacía y ${info.rol === "producer" ? "solo responde a lo que le llegue" : "solo reenvía lo que piden los barrios"}.${primero ? ` El primero llega a las <b>${hora(primero[0])}</b>.` : ""}</p>
+      ${primerLog(n, "Interest")}</div>`;
+    return;
+  }
+  const filas = D.ints[n] || [];
+  const usuario = filas.length ? filas[0][1] : "";
+  const errores = filas.filter(r => r[4]).length;
+  c.innerHTML = `<div style="display:grid;gap:12px;padding-top:12px">
+    <p class="estado">En t = 0 el reproductor de esta casa, del usuario <span class="mono">${usuario}</span>, tiene programadas <b>${fmt(filas.length)}</b> sesiones para __PERIODO__, ${D.logs ? `que dejan <b>${fmt(D.enviados[n])}</b> Interests en su captura: por episodio, el manifiesto y un segmento; si el nombre no tiene ruta, el manifiesto dos veces (el reintento). Las sesiones «solo si falla la anterior» no se envían si la anterior funcionó.` : `con unos <b>${fmt(filas.length + filas.reduce((s, r) => s + (r[7] || 0), 0))}</b> Interests: uno por miniatura y, por vídeo, el manifiesto y cada segmento.`} <b>${fmt(errores)}</b> sesiones llevan un nombre mal escrito y acabarán en Nack NoRoute. La primera empieza a las <b>${filas.length ? hora(filas[0][0]) : "—"}</b>.</p>
+    <div class="filtros">
+      <input type="search" id="buscar" placeholder="Buscar nombre o usuario" aria-label="Buscar nombre o usuario">
+      <select id="cat" aria-label="Tipo de sesión"><option value="">Todos los tipos</option>${Object.entries(CAT).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
+      <label><input type="checkbox" id="solo-err"> Solo con error de nombre</label>
+      <span class="cuenta" id="cuenta"></span>
+    </div>
+    <div class="tabla"><table><thead><tr><th>Hora prevista</th><th>Usuario</th><th>Interests de la sesión</th><th>Tipo</th></tr></thead><tbody id="cuerpo"></tbody></table></div>
+    <button type="button" class="mas" id="mas" hidden>Mostrar 300 más</button>
+    <p class="nota">La hora prevista suma las pausas y la duración de las sesiones anteriores de la misma visita${D.logs ? " (cada episodio dura 1 ms)" : ", así que es aproximada"}. La calidad de cada segmento la decide el reproductor durante la sesión según el caudal; aquí solo se ve el máximo del dispositivo. El tipo viene de <span class="mono">sesiones.csv</span>: el router no lo ve.</p>
+    ${primerLog(n, "Interest")}</div>`;
+  let limite = 300;
+  const cuerpo = c.querySelector("#cuerpo"), mas = c.querySelector("#mas"), cuenta = c.querySelector("#cuenta");
+  const filtrar = () => {
+    const q = c.querySelector("#buscar").value.trim().toLowerCase(), k = c.querySelector("#cat").value, e = c.querySelector("#solo-err").checked;
+    const v = filas.filter(r => (!q || r[2].toLowerCase().includes(q) || r[1].includes(q)) && (!k || r[3] === k) && (!e || r[4]));
+    cuenta.textContent = `${fmt(v.length)} de ${fmt(filas.length)}`;
+    cuerpo.innerHTML = v.slice(0, limite).map(r => `<tr${r[4] ? ' class="error"' : ""}><td class="num">${hora(r[0])}</td><td class="mono">${r[1]}</td>
+      <td class="nombre">${esc(r[2])}${r[6] !== undefined ? "/manifest" : ""}${segs(r)}${r[4] ? `<br><span style="color:var(--muted)">quería ${esc(r[5])}</span>` : ""}</td>
+      <td>${r[4] ? `<span class="etq err">${CAUSA[r[4]] || r[4]}</span>` : `<span class="etq">${CAT[r[3]] || r[3]}</span>`}${r[9] === "si_falla" ? ' <span class="etq">solo si falla la anterior</span>' : ""}</td></tr>`).join("");
+    mas.hidden = v.length <= limite;
+  };
+  ["buscar", "cat", "solo-err"].forEach(id => c.querySelector("#" + id).addEventListener("input", () => { limite = 300; filtrar(); }));
+  mas.addEventListener("click", () => { limite += 300; filtrar(); });
+  filtrar();
+}
+
+function data(n, info, c) {
+  if (info.rol !== "producer") {
+    c.innerHTML = `<div style="display:grid;gap:12px;padding-top:12px">
+      <p class="estado">En t = 0 la caché de este nodo está vacía: tiene sitio para <b>${fmt(info.cs)}</b> paquetes Data, pero aún no ha pasado ninguno. Se llenará con lo que pidan los barrios que cuelgan de él.</p>
+      ${primerLog(n, "Data")}</div>`;
+    return;
+  }
+  const filas = D.prod[n] || [];
+  const total = filas.reduce((s, r) => s + (r.c || 0), 0);
+  c.innerHTML = `<div style="display:grid;gap:12px;padding-top:12px">
+    <p class="estado">En t = 0 este productor anuncia <b>${fmt(filas.length)}</b> prefijos${total ? ` con <b>${fmt(total)}</b> vídeos` : ""}. ${n.startsWith("yt-") ? "Bajo cada canal solo anuncia los títulos de sus vídeos: un título que no existe da NoRoute." : "Responde con un Data a cualquier nombre que cuelgue de ellos."} Cada vídeo tiene un manifiesto y sus segmentos de 4 s en cinco calidades: 240p, 480p, 720p, 1080p y 2160p, de 200 a 8.000 bytes cada uno a escala 1:1000.</p>
+    <div class="filtros"><input type="search" id="buscar" placeholder="Buscar título, prefijo, género o vídeo" aria-label="Buscar título, prefijo, género o vídeo"><span class="cuenta" id="cuenta"></span></div>
+    <div class="tabla"><table><thead><tr><th>Prefijo</th><th>Título</th><th>Géneros o temática</th><th>Vídeos</th><th>Segmentos por vídeo</th><th>IMDb</th></tr></thead><tbody id="cuerpo"></tbody></table></div>
+    <button type="button" class="mas" id="mas" hidden>Mostrar 300 más</button>
+    <p class="nota">Los votos y el año de IMDb solo están en el catálogo de <span class="mono">/vod</span>. RTVE es una lista hecha a mano. Los canales de <span class="mono">/yt</span>, sus vídeos y los shorts salen del dataset Trending YouTube Video Statistics de México (2017-2018); el nombre de cada vídeo es su título.</p>
+    ${primerLog(n, "Data")}</div>`;
+  let limite = 300;
+  const cuerpo = c.querySelector("#cuerpo"), mas = c.querySelector("#mas"), cuenta = c.querySelector("#cuenta");
+  const filtrar = () => {
+    const q = c.querySelector("#buscar").value.trim().toLowerCase();
+    const v = filas.filter(r => !q || [r.p, r.n || "", ...(r.g || []), ...(r.t || [])].join(" ").toLowerCase().includes(q));
+    cuenta.textContent = `${fmt(v.length)} de ${fmt(filas.length)}`;
+    cuerpo.innerHTML = v.slice(0, limite).map(r => `<tr><td class="nombre">${esc(r.p)}</td>
+      <td>${esc(r.n || "")}${r.es ? ' <span class="etq">española</span>' : ""}${r.ant ? `<br><span class="nota">antes ${esc(r.ant)}</span>` : ""}${r.h ? `<br><span class="nota">se estrena a las ${hora(r.h * 3600)}</span>` : ""}${r.t ? `<br><span class="nota mono">${(q ? r.t.filter(x => x.includes(q)) : r.t).slice(0, 3).map(esc).join("<br>")}${r.t.length > 3 ? "<br>…" : ""}</span>` : ""}</td>
+      <td>${(r.g || []).map(esc).join(", ")}</td>
+      <td class="num">${r.c ? fmt(r.c) + " " + r.f : r.f || ""}</td>
+      <td class="num">${r.m ? `≈ ${fmt(Math.ceil(r.m * 60 / 4))} × 5 calidades<br><span class="nota">${r.m} min${r.f === "vídeos" ? " de media" : ""}</span>` : r.f === "emisión continua" ? "uno cada 4 s" : r.f === "vídeos cortos" ? "4 a 15 × 5 calidades" : "—"}</td>
+      <td class="num">${r.i ? `<a href="https://www.imdb.com/title/${r.i}/" target="_blank" rel="noopener">${fmt(r.v)} votos</a> · ${r.a}` : "—"}</td></tr>`).join("");
+    mas.hidden = v.length <= limite;
+  };
+  c.querySelector("#buscar").addEventListener("input", () => { limite = 300; filtrar(); });
+  mas.addEventListener("click", () => { limite += 300; filtrar(); });
+  filtrar();
+}
+
+let inicial = "barrio-mad-1";
+try { const g = localStorage.getItem("nodo"); if (g && D.nodos[g]) inicial = g; } catch (e) {}
+elegir(inicial);
+</script>

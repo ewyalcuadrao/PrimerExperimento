@@ -1,4 +1,4 @@
-"""Red NDN de un operador español con plataformas de vídeo reales (24 h).
+"""Red NDN de un operador español con plataformas de vídeo reales (3 días).
 
   vod-series vod-cine vod-docs   yt-canales-a yt-canales-b yt-shorts   rtve-play rtve-directo
          \\     |     /                 \\      |      /                    \\    /
@@ -8,7 +8,7 @@
                           |                                   /      \\
                        core-mad ──────────────────────── core-bcn   core-vlc
                   núcleo en malla: core-mad, core-bcn, core-vlc, core-svq, core-bio
-         cada core ── 2 routers de agregación ── 1 barrio cada uno (hogares)
+         cada core ── 2 routers de agregación ── 1 casa cada uno (nodos barrio-*)
 
 - Cada plataforma tiene un router de borde y servidores separados por sección del
   catálogo; cada servidor anuncia un prefijo por temporada, película o canal.
@@ -19,14 +19,16 @@
 
 - Contenidos (video/catalogo.py): series, películas y documentales reales en /vod,
   RTVE Play en /rtve (con canales en directo) y vídeos de usuarios en /yt.
-- Usuarios (video/humanos.py): ~600 personas repartidas por barrios según la
-  población de cada ciudad, con su edad, dispositivo, horario y gustos; ven series,
-  películas, YouTube, shorts y directos a lo largo del día.
-- Reproductor (ndnutils/video-player.cpp): cada contenido es un solo nombre y un
-  solo Data (sin segmentos ni calidades); la sesión dura lo que dura el vídeo.
-  Reintenta tras un Nack y si el Interest caduca.
-- Escala: los Data no pesan lo que pesaría el vídeo real; la red no se congestiona
-  por volumen de vídeo, solo se miden nombres, rutas y resultados.
+- Usuarios (video/humanos.py): se generan ~600 personas repartidas por barrios según
+  la población de cada ciudad, con su edad, dispositivo, horario y gustos, y cada
+  nodo barrio-* es la casa de una de ellas: la que ve más títulos distintos. Así hay
+  10 consumidores, cada uno con su log, como las máquinas con las que se entrenará
+  el modelo.
+- Reproductor (ndnutils/video-player.cpp): como un cliente DASH, pide el manifiesto
+  y luego los segmentos de 4 s, eligiendo la calidad de cada uno según el caudal
+  medido (240p a 2160p). Reintenta tras un Nack y si el Interest caduca.
+- Escala: anchos de banda y tamaños de los Data a 1:1000 de los reales
+  (ndnutils/video-common.hpp), así que el vídeo sí carga la red.
 
 Con --modelo, los routers usan la estrategia de similitud en modo redirección: si no
 hay ruta, contestan con un Data de tipo Link al nombre válido más parecido (con
@@ -72,9 +74,9 @@ from video.humanos import Generador
 DIR = os.path.dirname(os.path.abspath(__file__))
 
 parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-parser.add_argument("--horas", type=float, default=24.0, help="horas simuladas desde las 00:00")
+parser.add_argument("--horas", type=float, default=72.0, help="horas simuladas desde las 00:00 (3 días)")
 parser.add_argument("--escala", type=float, default=1.0, help="factor sobre el número de usuarios")
-parser.add_argument("--seed", type=int, default=1)
+parser.add_argument("--seed", type=int, default=3)  # con la 3, ~20 % de NoRoute en las casas
 parser.add_argument("--salida", default=os.path.join(DIR, "resultados", "video"))
 parser.add_argument("--modelo", help="carpeta de modelos: activa el reenvío por similitud")
 parser.add_argument("--umbral", type=float, default=0.9, help="similitud mínima para redirigir")
@@ -104,8 +106,7 @@ SERVIDORES = {
     "rtve-play": "madrid", "rtve-directo": "madrid",
 }
 BORDES = {"vod-borde": "dublin", "yt-borde": "frankfurt", "rtve-borde": "madrid"}
-YT_CANALES_A = {"gaming", "musica", "vlogs", "humor", "deporte", "motor", "viajes", "belleza",
-                "fitness", "cine"}  # el resto, en yt-canales-b
+YT_CANALES_A = {"entretenimiento", "musica", "humor", "cine", "gaming"}  # el resto, en yt-canales-b
 
 
 def servidor_de(prefijo, tematica=None):
@@ -136,10 +137,11 @@ for core, ciudad in CORES.items():
 for barrio in BARRIOS:
     core = "core-" + barrio.split("-")[1]
     NODOS["agg-" + barrio[len("barrio-"):]] = ("router", CORES[core], 1500)
-    NODOS[barrio] = ("consumer", CORES[core], 300)
+    NODOS[barrio] = ("consumer", CORES[core], 100)  # la casa: caché del dispositivo
 
-# Anchos de banda a 1:1000 de los reales (100G troncal, 10G agregación, GPON 2,5G)
-INTERNACIONAL, TRONCAL, AGREGACION, ACCESO, RURAL_BW = "100Mbps", "100Mbps", "10Mbps", "2500Kbps", "120Kbps"
+# Anchos de banda a 1:1000 de los reales (100G troncal, 10G agregación, fibra de 1G
+# en cada casa; en la zona rural, 100M por radioenlace)
+INTERNACIONAL, TRONCAL, AGREGACION, ACCESO, RURAL_BW = "100Mbps", "100Mbps", "10Mbps", "1Mbps", "100Kbps"
 KM_POR_MS = 100  # fibra con el doble de recorrido que la línea recta
 
 ENLACES = [(s, s.split("-")[0] + "-borde", INTERNACIONAL) for s in SERVIDORES]  # centro de datos
@@ -198,21 +200,23 @@ for name, (_, _, cs) in NODOS.items():
 # ---------- Servidores ----------
 # Una aplicación por temporada, película, canal en directo o canal de vídeos, en el
 # servidor de su sección. Un nombre que no corresponde a ninguna (mal escrito,
-# plataforma equivocada...) no tiene ruta en el núcleo y da NoRoute.
+# plataforma equivocada...) no tiene ruta en el núcleo y da NoRoute. Los servidores de
+# /yt anuncian, bajo el prefijo del canal, solo los títulos de sus vídeos.
 
-APLICACIONES = []  # (nodo, prefijo, directo, hora de inicio)
+APLICACIONES = []  # (nodo, prefijo, directo, hora de inicio, nombres bajo el prefijo)
 for t in cat.TITULOS:
     servidor = servidor_de(t.prefijo())
     if t.temporadas:
         for temporada in range(1, len(t.temporadas) + 1):
-            APLICACIONES.append((servidor, t.prefijo(temporada), False, t.estreno.get(temporada, 0)))
+            APLICACIONES.append((servidor, t.prefijo(temporada), False, t.estreno.get(temporada, 0), ""))
     else:
-        APLICACIONES.append((servidor, t.prefijo(), False, 0))
+        APLICACIONES.append((servidor, t.prefijo(), False, 0, ""))
 for canal in cat.DIRECTOS:
-    APLICACIONES.append(("rtve-directo", f"/rtve/directo/{canal}", True, 0))
+    APLICACIONES.append(("rtve-directo", f"/rtve/directo/{canal}", True, 0, ""))
 for canal in cat.canales():
-    APLICACIONES.append((servidor_de(f"/yt/{canal.slug}", canal.tematica), f"/yt/{canal.slug}", False, 0))
-APLICACIONES.append(("yt-shorts", "/yt/shorts", False, 0))
+    APLICACIONES.append((servidor_de(f"/yt/{canal.slug}", canal.tematica), f"/yt/{canal.slug}", False, 0,
+                         " ".join(canal.videos)))
+APLICACIONES.append(("yt-shorts", "/yt/shorts", False, 0, " ".join(cat.SHORTS)))
 
 # ---------- Reenvío y rutas ----------
 
@@ -238,7 +242,7 @@ else:
 
 routing = ndn.GlobalRoutingHelper()
 routing.InstallAll()
-for node, prefix, _, _ in APLICACIONES:
+for node, prefix, _, _, _ in APLICACIONES:
     c = NodeContainer()
     c.Add(nodes[node])
     routing.AddOrigins(prefix, c)
@@ -250,9 +254,11 @@ for barrio in BARRIOS:
     ndnutils.ruta_por_defecto(agg, "core-" + barrio.split("-")[1])
     ndnutils.ruta_por_defecto(barrio, agg)
 
-for node, prefix, directo, hora in APLICACIONES:
+for node, prefix, directo, hora, nombres in APLICACIONES:
     app = ndn.AppHelper("ns3::ndn::VideoProducer")
     app.SetPrefix(prefix)
+    app.SetAttribute("Directo", BooleanValue(directo))
+    app.SetAttribute("Nombres", StringValue(nombres))
     app.Install(nodes[node]).Start(Seconds(hora * 3600))
 
 # ---------- Usuarios ----------
@@ -260,8 +266,11 @@ for node, prefix, directo, hora in APLICACIONES:
 out = args.salida
 os.makedirs(out, exist_ok=True)
 usuarios_por_barrio = {b: max(1, round(n * args.escala)) for b, n in BARRIOS.items()}
-gen = Generador(usuarios_por_barrio, seed=args.seed, horas=args.horas)
+gen = Generador(usuarios_por_barrio, seed=args.seed, horas=args.horas, solo_episodios=True)
 gen.generar()
+
+# Una casa por barrio, que es la máquina de un solo usuario (ver una_casa_por_barrio)
+gen.una_casa_por_barrio()
 ruta_sesiones = gen.guardar(out)
 print(gen.resumen())
 
@@ -289,8 +298,8 @@ with open(os.path.join(out, "escenario.json"), "w") as f:
     json.dump({
         "nodos": {n: {"rol": r, "ciudad": c, "cs": cs} for n, (r, c, cs) in NODOS.items()},
         "enlaces": [{"source": a, "target": b, "DataRate": bw, "Delay": retardo(a, b)} for a, b, bw in ENLACES],
-        "servidores": {s: sorted({p for n, p, _, _ in APLICACIONES if n == s}) for s in SERVIDORES},
-        "aplicaciones": [{"nodo": n, "prefijo": p, "directo": d, "inicio_h": h} for n, p, d, h in APLICACIONES],
+        "servidores": {s: sorted({p for n, p, _, _, _ in APLICACIONES if n == s}) for s in SERVIDORES},
+        "aplicaciones": [{"nodo": n, "prefijo": p, "directo": d, "inicio_h": h} for n, p, d, h, _ in APLICACIONES],
         "params": {"horas": args.horas, "escala": args.escala, "seed": args.seed,
                    "modelo": args.modelo, "umbral": args.umbral if args.modelo else None,
                    "similitud": args.similitud if args.modelo else None,
@@ -343,4 +352,9 @@ if redirigidas:
 ok = [q for q in video if q["resultado"] == "completa"]
 if ok:
     print(f"Sesiones completas: arranque medio {sum(float(q['arranque_s']) for q in ok) / len(ok):.3f} s")
+    vod = [q for q in ok if int(q["segmentos"])]
+    if vod:
+        print(f"  con paradas {sum(int(q['paradas']) > 0 for q in vod)} de {len(vod)}, "
+              f"{sum(float(q['parado_s']) for q in vod):.0f} s parados en total, "
+              f"calidad media {sum(float(q['kbps_medio']) for q in vod) / len(vod):.0f} kb/s")
 print(f"\nResultados en {out}/")

@@ -17,6 +17,7 @@
 
 #include <cstdio>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -160,7 +161,9 @@ ndnutils_packet_log(const char* file)
     g_out = std::make_shared<std::ofstream>(file);
     if (!*g_out)
       throw std::runtime_error(std::string("no se puede abrir ") + file);
-    *g_out << HEADER;
+    // Tiempo en segundos con resolución de microsegundos (por defecto C++ escribe 6
+    // cifras significativas: a partir de 100 000 s solo quedarían segundos enteros)
+    *g_out << std::fixed << std::setprecision(6) << HEADER;
 
     for (auto node = NodeList::Begin(); node != NodeList::End(); ++node) {
       Ptr<ns3::ndn::L3Protocol> l3 = (*node)->GetObject<ns3::ndn::L3Protocol>();

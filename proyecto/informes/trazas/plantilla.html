@@ -1,0 +1,358 @@
+<title>Trazas NDN según la especificación</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,750&family=Public+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: cuaderno de laboratorio. Lo que dice la especificación (cobre) frente a lo que guardan nuestros logs (pizarra); los paquetes se abren byte a byte. */
+:root {
+  --bg: #f2f4f3; --panel: #ffffff; --ink: #17211e; --muted: #57655f; --line: #d3dbd7; --soft: #e7ecea;
+  --spec: #a4511b; --spec-soft: #f6e6da; --log: #2c5b88; --log-soft: #e0eaf4;
+  --ok: #2f7a4f; --warn: #a06a00; --no: #a8323a; --dot: #17211e;
+  --t0: #f1e3d3; --t1: #dbe8df; --t2: #e3e0f2; --t3: #f5ecc9; --t4: #dce9f2; --eth: #e2e5e4;
+  --display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111816; --panel: #18211e; --ink: #e4ebe8; --muted: #9aa9a2; --line: #2c3833; --soft: #202b27;
+  --spec: #e7955c; --spec-soft: #3a2619; --log: #82b2e0; --log-soft: #1c2a38;
+  --ok: #6cc290; --warn: #e0b04a; --no: #ee8a90; --dot: #e4ebe8;
+  --t0: #3d2c1d; --t1: #1e3427; --t2: #2b2842; --t3: #3a3418; --t4: #1d2f3d; --eth: #2a312f; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111816; --panel: #18211e; --ink: #e4ebe8; --muted: #9aa9a2; --line: #2c3833; --soft: #202b27;
+  --spec: #e7955c; --spec-soft: #3a2619; --log: #82b2e0; --log-soft: #1c2a38;
+  --ok: #6cc290; --warn: #e0b04a; --no: #ee8a90; --dot: #e4ebe8;
+  --t0: #3d2c1d; --t1: #1e3427; --t2: #2b2842; --t3: #3a3418; --t4: #1d2f3d; --eth: #2a312f; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 32px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 { font-size: clamp(2rem, 4.5vw, 3.1rem); line-height: 1.02; font-weight: 750; }
+h2 { font-size: 1.6rem; line-height: 1.15; font-weight: 750; }
+h3 { font-size: 1.1rem; font-weight: 600; }
+p { margin: 0; }
+.lede { max-width: 68ch; color: var(--muted); font-size: 1.06rem; }
+.lede b { color: var(--ink); }
+.mono { font-family: var(--mono); font-size: .88em; }
+section { display: grid; gap: 18px; min-width: 0; }
+.cab { display: grid; gap: 6px; max-width: 74ch; }
+.cab p { color: var(--muted); }
+.eti { font: 600 .72rem var(--body); text-transform: uppercase; letter-spacing: .1em; }
+.spec { color: var(--spec); } .log { color: var(--log); }
+
+.miradas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.mirada { border-radius: 10px; padding: 16px 18px; display: grid; gap: 6px; min-width: 0; align-content: start; }
+.mirada.r { background: var(--spec-soft); } .mirada.s { background: var(--log-soft); }
+.mirada p { font-size: .95rem; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.svgcaja { overflow-x: auto; }
+.svgcaja svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.nodo rect { fill: var(--soft); stroke: var(--line); stroke-width: 1.5; transition: fill .2s, stroke .2s; }
+.nodo text { font: 500 11px var(--body); fill: var(--ink); text-anchor: middle; }
+.nodo text.sub { font: 400 9.5px var(--mono); fill: var(--muted); }
+.nodo.on rect { fill: var(--spec-soft); stroke: var(--spec); }
+.arista { stroke: var(--line); stroke-width: 2; }
+.arista.lejos { stroke-dasharray: 3 4; }
+.arista.on { stroke: var(--ink); }
+.lente { fill: none; stroke: var(--log); stroke-width: 2; stroke-dasharray: 5 4; }
+.lentet { font: 600 10.5px var(--body); fill: var(--log); text-anchor: middle; }
+.paq { fill: var(--dot); transition: cx .35s ease, opacity .2s; }
+.controles { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font: 600 .9rem var(--body); border-radius: 7px; padding: 6px 12px; cursor: pointer; border: 1px solid var(--line); background: var(--soft); color: var(--ink); }
+button:hover { border-color: var(--ink); }
+button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.paso { font: 500 .85rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.explica { min-height: 3.2em; font-size: .93rem; padding: 10px 12px; border-radius: 8px; background: var(--soft); }
+.tabla { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font: .78rem/1.4 var(--mono); }
+th { text-align: left; font: 600 .68rem var(--body); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); background: var(--soft); padding: 6px 8px; white-space: nowrap; }
+td { padding: 5px 8px; border-top: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+tr.nuevo td { background: var(--log-soft); }
+tr.fuera td { color: var(--muted); font-style: italic; }
+tr.fuera td:first-child { border-left: 3px solid var(--warn); }
+tr.fut { display: none; }
+.marca { font: 600 .66rem var(--body); font-style: normal; text-transform: uppercase; letter-spacing: .06em; color: var(--warn); }
+.nota { font-size: .85rem; color: var(--muted); }
+
+.inspector { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.selector { display: flex; flex-wrap: wrap; gap: 8px; }
+.hex { font: .86rem/1.9 var(--mono); display: flex; flex-wrap: wrap; gap: 2px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+.hex span { padding: 0 3px; border-radius: 3px; cursor: pointer; }
+.hex span.cab { opacity: .62; }
+.hex span.sel { outline: 2px solid var(--ink); outline-offset: -1px; opacity: 1; }
+.arbol { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 2px; font-size: .88rem; }
+.arbol button { all: unset; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+.arbol button:hover, .arbol button.sel { background: var(--soft); }
+.arbol button:focus-visible { outline: 2px solid var(--ink); }
+.arbol .tn { font-weight: 600; } .arbol .tv { font-family: var(--mono); font-size: .82rem; color: var(--muted); word-break: break-all; }
+.arbol .sw { width: 10px; height: 10px; border-radius: 2px; align-self: center; }
+.arbol .capa { font: 600 .68rem var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 6px 8px 2px; }
+.leyendahex { font-size: .85rem; color: var(--muted); }
+
+.chip { display: inline-block; font: 600 .74rem var(--body); padding: 2px 9px; border-radius: 99px; border: 1.5px solid currentColor; white-space: nowrap; }
+.chip.si { color: var(--ok); } .chip.no { color: var(--no); } .chip.ded { color: var(--warn); }
+.comp td { white-space: normal; font: .88rem/1.45 var(--body); vertical-align: top; padding: 8px 10px; }
+.comp td:first-child { font-family: var(--mono); font-size: .82rem; white-space: nowrap; }
+.comp th { font-size: .7rem; padding: 8px 10px; }
+.bloques { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.bloque { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 4px; align-content: start; }
+.bloque b { font-family: var(--mono); font-size: .85rem; }
+.bloque p { font-size: .88rem; color: var(--muted); }
+.fuentes { font-size: .92rem; display: grid; gap: 6px; }
+.fuentes a { color: var(--log); }
+.fuentes span { color: var(--muted); }
+
+@media (max-width: 820px) { .miradas, .inspector { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .paq, .nodo rect { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:18px">
+    <span class="eti" style="color:var(--muted)">Named Data Networking · formato de las trazas</span>
+    <h1>Trazas NDN según la especificación</h1>
+    <p class="lede">En NDN cada paquete es una estructura <b>TLV</b> (tipo, longitud, valor) y los nodos se los pasan por sus <i>faces</i>. Sobre Ethernet, cada paquete va dentro de una trama con el ethertype de NDN, <span class="mono">0x8624</span>, sin IP ni UDP. Una traza es lo que se captura en una tarjeta de red: las tramas tal cual, con su hora, en un fichero <span class="mono">pcapng</span>. Los logs de las casas son eso.</p>
+    <div class="miradas">
+      <div class="mirada r"><span class="eti spec">Lo que dice la especificación</span>
+        <p>Interest y Data se definen en el <b>NDN Packet Format v0.3</b>. Lo que solo tiene sentido entre dos vecinos (un Nack, fragmentos, confirmaciones) va en la capa de enlace <b>NDNLPv2</b>, en un <span class="mono">LpPacket</span>. Si no hace falta nada de eso, el paquete viaja suelto.</p></div>
+      <div class="mirada s"><span class="eti log">Lo que guardan nuestros logs · __ESCENARIO__</span>
+        <p>Una captura por casa, en su tarjeta de red, con <b>las tramas de los Interest que salen</b> hacia su router de acceso. Se decodifican a <span class="mono">interests/&lt;casa&gt;.csv</span>. Qué pasó con cada uno (Data o Nack) va aparte, en <span class="mono">etiquetas.csv</span>, solo para evaluar.</p></div>
+    </div>
+  </header>
+
+  <section aria-labelledby="h-viaje">
+    <div class="cab"><span class="eti">1 · Un intercambio</span>
+      <h2 id="h-viaje">Qué ve la tarjeta de red de la casa</h2>
+      <p>Dos sesiones reales de <span class="mono">__CASA__</span>, paso a paso. Solo deja rastro en la captura lo que cruza el recuadro: el enlace entre la casa y su router de acceso. Lo que hacen dentro NFD y los routers (caché, PIT, FIB) no sale a ningún cable.</p></div>
+    <div class="panel">
+      <div class="selector" role="group" aria-label="Sesión">
+        <button type="button" data-e="nr" aria-pressed="true">Nombre mal escrito: NoRoute</button>
+        <button type="button" data-e="ok" aria-pressed="false">Nombre correcto: llega el Data</button>
+      </div>
+      <div class="svgcaja"><svg id="svg" viewBox="0 0 640 150" role="img" aria-label="Camino: reproductor, NFD de la casa, router de acceso, resto de la red y productor; la captura está en el enlace entre la casa y el router"></svg></div>
+      <div class="controles"><button type="button" id="sig">Siguiente</button><button type="button" id="play" aria-pressed="false">Reproducir</button><button type="button" id="reset">Reiniciar</button><span class="paso" id="paso"></span></div>
+      <p class="explica" id="exp"></p>
+      <div class="tabla"><table><thead><tr><th>time</th><th>src</th><th>dst</th><th>tipo</th><th>nombre</th><th>bytes</th><th>nonce</th><th>lifetime_ms</th></tr></thead><tbody id="filas"></tbody></table></div>
+      <p class="nota">Las filas son las de <span class="mono">interests/__CASA__.csv</span>. Las marcadas <span class="marca">no se guarda</span> son tramas que entrarían en la casa: sin simular la red no tienen hora.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-bytes">
+    <div class="cab"><span class="eti">2 · Dentro de la trama</span>
+      <h2 id="h-bytes">Abre un paquete, byte a byte</h2>
+      <p>Pulsa un campo del árbol o un byte. Gris: la cabecera Ethernet. Los bytes atenuados son el tipo y la longitud de cada TLV, y los campos se anidan. Los dos Interest son tramas de nuestras capturas. El Data y el Nack están construidos según la especificación con lo que respondería la red.</p></div>
+    <div class="selector" role="group" aria-label="Paquete">
+      <button type="button" data-p="interest" aria-pressed="true">Interest: manifiesto</button>
+      <button type="button" data-p="seg" aria-pressed="false">Interest: segmento</button>
+      <button type="button" data-p="data" aria-pressed="false">Data: manifiesto</button>
+      <button type="button" data-p="nack" aria-pressed="false">Nack NoRoute</button>
+    </div>
+    <div class="inspector">
+      <div style="display:grid;gap:10px;min-width:0">
+        <div class="hex" id="hex" aria-label="Bytes de la trama"></div>
+        <p class="leyendahex" id="hex-info"></p>
+      </div>
+      <div class="arbol" id="arbol" role="tree" aria-label="Campos de la trama"></div>
+    </div>
+    <p class="explica" id="campo-exp"></p>
+  </section>
+
+  <section aria-labelledby="h-columnas">
+    <div class="cab"><span class="eti">3 · De la captura al CSV</span>
+      <h2 id="h-columnas">De dónde sale cada columna</h2>
+      <p>El fichero <span class="mono">capturas/&lt;casa&gt;.pcapng</span> son bloques seguidos. Al decodificarlo, cada trama da una fila de <span class="mono">interests/&lt;casa&gt;.csv</span>. Todo sale de los bytes capturados: nada se añade desde la simulación.</p></div>
+    <div class="bloques">
+      <div class="bloque"><b>Section Header Block</b><p>Abre el fichero: versión 1.0 y orden de los bytes.</p></div>
+      <div class="bloque"><b>Interface Description Block</b><p>La tarjeta capturada: tipo de enlace 1 (Ethernet) y su nombre. Una por casa.</p></div>
+      <div class="bloque"><b>Enhanced Packet Block</b><p>Uno por trama: la hora en microsegundos desde 1970 y los bytes de la trama completa.</p></div>
+    </div>
+    <div class="comp"><div class="tabla"><table><thead><tr><th>Columna</th><th>Sale de</th><th>Detalle</th></tr></thead><tbody id="comp"></tbody></table></div></div>
+    <h3>Campos del Interest que la especificación permite y nuestros Interest no llevan</h3>
+    <div class="comp"><div class="tabla"><table><thead><tr><th>Campo</th><th>Por qué no aparece</th></tr></thead><tbody id="opcionales"></tbody></table></div></div>
+  </section>
+
+  <section aria-labelledby="h-fuentes">
+    <h2 id="h-fuentes" style="font-size:1.2rem">Fuentes</h2>
+    <div class="fuentes">
+      <a href="https://docs.named-data.net/NDN-packet-spec/current/" target="_blank" rel="noopener">NDN Packet Format Specification v0.3</a><span>Interest, Data, TLV, NonNegativeInteger, orden de los campos, firma DigestSha256.</span>
+      <a href="https://redmine.named-data.net/projects/nfd/wiki/NDNLPv2" target="_blank" rel="noopener">NDNLPv2</a><span>LpPacket, Fragment, Nack y NackReason; paquetes sueltos sin LpPacket.</span>
+      <a href="https://redmine.named-data.net/projects/ndn-tlv/wiki/NameComponentType" target="_blank" rel="noopener">NDN Naming Conventions: tipos de componente</a><span>SegmentNameComponent (50), escrito seg=N.</span>
+      <a href="https://gerrit.named-data.net/plugins/gitiles/NFD/+/452e2822e7ea685609427090c83ec35ee8b4b263/daemon/face/ethernet.hpp" target="_blank" rel="noopener">NFD, daemon/face/ethernet.hpp</a><span>Ethertype 0x8624 para NDN sobre Ethernet.</span>
+      <a href="https://docs.named-data.net/NFD/current/" target="_blank" rel="noopener">NFD Developer's Guide</a><span>Pipelines de Interest y Data: caché, PIT, FIB y Nack NoRoute.</span>
+      <a href="https://www.ietf.org/archive/id/draft-ietf-opsawg-pcapng-02.html" target="_blank" rel="noopener">PCAP Next Generation (pcapng)</a><span>Bloques SHB, IDB y EPB.</span>
+    </div>
+  </section>
+</div>
+
+<script id="datos" type="application/json">__DATOS__</script>
+<script>
+const D = JSON.parse(document.getElementById("datos").textContent);
+const NS = "http://www.w3.org/2000/svg";
+const mk = (tag, a, p) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- Visor del intercambio ---------- */
+const NODOS = [
+  { id: "app", t: "Reproductor", s: "aplicación" }, { id: "nfd", t: "NFD de la casa", s: "02:..:02" },
+  { id: "router", t: "Router de acceso", s: "02:..:01" }, { id: "prod", t: "Productor", s: "plataforma" }];
+const X = { app: 70, nfd: 210, router: 410, prod: 570 }, Y = 78;
+const svg = document.getElementById("svg");
+const aristas = {};
+[["app", "nfd"], ["nfd", "router"], ["router", "prod"]].forEach(([a, b]) => {
+  aristas[a + b] = aristas[b + a] = mk("line", { class: "arista" + (a === "router" ? " lejos" : ""), x1: X[a], y1: Y, x2: X[b], y2: Y }, svg);
+});
+mk("rect", { class: "lente", x: X.nfd + 50, y: 44, width: X.router - X.nfd - 100, height: 68, rx: 10 }, svg);
+mk("text", { class: "lentet", x: (X.nfd + X.router) / 2, y: 36 }, svg).textContent = "captura en la tarjeta de la casa";
+mk("text", { class: "lentet", x: (X.app + X.nfd) / 2, y: 132, style: "fill:var(--muted)" }, svg).textContent = "socket local";
+mk("text", { class: "lentet", x: (X.router + X.prod) / 2, y: 132, style: "fill:var(--muted)" }, svg).textContent = "resto de la red";
+const g = {};
+NODOS.forEach(n => {
+  const grp = mk("g", { class: "nodo" }, svg);
+  mk("rect", { x: X[n.id] - 56, y: Y - 20, width: 112, height: 40, rx: 7 }, grp);
+  mk("text", { x: X[n.id], y: Y - 3 }, grp).textContent = n.t;
+  mk("text", { class: "sub", x: X[n.id], y: Y + 11 }, grp).textContent = n.s;
+  g[n.id] = grp;
+});
+const paq = mk("circle", { class: "paq", r: 7, cx: X.app, cy: 52, opacity: 0 }, svg);
+const tbody = document.getElementById("filas"), exp = document.getElementById("exp"), pasoEl = document.getElementById("paso"), play = document.getElementById("play");
+let esc_ = "nr", i = 0, timer = null, trs = [];
+
+function cargar(e) {
+  esc_ = e; i = 0; parar();
+  document.querySelectorAll("[data-e]").forEach(b => b.setAttribute("aria-pressed", b.dataset.e === e));
+  const pasos = D[e];
+  tbody.innerHTML = pasos.map(p => p.fila ? `<tr class="fut${p.nuestro === false ? " fuera" : ""}">${p.fila.map((c, k) => `<td>${k === 0 && p.nuestro === false ? '<span class="marca">no se guarda</span>' : esc(c)}</td>`).join("")}</tr>` : "").join("");
+  trs = [...tbody.children];
+  pinta();
+}
+function pinta() {
+  const pasos = D[esc_];
+  Object.values(g).forEach(n => n.classList.remove("on"));
+  Object.values(aristas).forEach(a => a.classList.remove("on"));
+  let k = 0;
+  pasos.forEach((p, j) => { if (!p.fila) return; const tr = trs[k++]; tr.classList.toggle("fut", j >= i); tr.classList.toggle("nuevo", j === i - 1); });
+  pasoEl.textContent = `${i} / ${pasos.length}`;
+  if (i === 0) { exp.textContent = "Pulsa Siguiente o Reproducir."; paq.setAttribute("opacity", 0); return; }
+  const p = pasos[i - 1];
+  exp.innerHTML = p.exp;
+  if (p.en) { g[p.en].classList.add("on"); paq.setAttribute("cx", X[p.en]); }
+  else {
+    aristas[p.de + p.a].classList.add("on"); g[p.a].classList.add("on");
+    paq.setAttribute("cx", (X[p.de] + X[p.a]) / 2);
+  }
+  paq.setAttribute("opacity", 1);
+  const tipo = p.fila ? p.fila[3] : (p.de === "prod" ? "Data" : "Interest");
+  paq.style.fill = tipo === "Data" ? "var(--ok)" : tipo === "Nack" ? "var(--no)" : p.en ? "var(--muted)" : "var(--dot)";
+}
+function sig() { if (i < D[esc_].length) { i++; pinta(); } else parar(); }
+function parar() { clearInterval(timer); timer = null; play.setAttribute("aria-pressed", "false"); play.textContent = "Reproducir"; }
+document.getElementById("sig").addEventListener("click", () => { parar(); sig(); });
+document.getElementById("reset").addEventListener("click", () => { parar(); i = 0; pinta(); });
+play.addEventListener("click", () => {
+  if (timer) return parar();
+  if (i >= D[esc_].length) i = 0;
+  play.setAttribute("aria-pressed", "true"); play.textContent = "Pausa";
+  sig(); timer = setInterval(sig, reduce ? 2200 : 1700);
+});
+document.querySelectorAll("[data-e]").forEach(b => b.addEventListener("click", () => cargar(b.dataset.e)));
+cargar("nr");
+
+/* ---------- Inspector de bytes ---------- */
+const COL = ["var(--t0)", "var(--t1)", "var(--t2)", "var(--t3)", "var(--t4)"];
+const color = c => c.eth ? "var(--eth)" : COL[c.nivel % 5];
+const EXPL = {
+  Destino: "MAC del router de acceso. Son direcciones administradas localmente (02:…): una por casa y otra por su router.",
+  Origen: "MAC de la tarjeta de la casa.",
+  EtherType: "0x8624 dice que lo que sigue es un paquete NDN. Es el valor que usa NFD para sus faces Ethernet.",
+  Relleno: "Ethernet exige tramas de al menos 60 bytes (sin el FCS). Si el paquete es más corto, se rellena con ceros. No es parte del paquete NDN.",
+  LpPacket: "Sobre de NDNLPv2, la capa de enlace de NDN. Solo aparece cuando hace falta un campo de enlace, como aquí el Nack.",
+  Nack: "Rechazo: el vecino devuelve el Interest explicando por qué no lo reenvía. No es un tipo de paquete de red, sino un campo de NDNLPv2.",
+  NackReason: "El motivo: 50 Congestion, 100 Duplicate, 150 NoRoute. NoRoute: la FIB no tiene ningún prefijo para ese nombre.",
+  Fragment: "Lo que va dentro del sobre: el paquete NDN. En un Nack es el Interest rechazado, entero, con su Nonce.",
+  Interest: "La petición (tipo 5). Sus campos van en el orden que fija la especificación: Name, CanBePrefix, MustBeFresh, ForwardingHint, Nonce, InterestLifetime, HopLimit, ApplicationParameters. Los que no se usan no se escriben.",
+  Data: "La respuesta (tipo 6), con el mismo nombre que el Interest. Lleva siempre firma.",
+  Name: "El nombre, como una lista de componentes. En el CSV se escribe en forma de URI: /vod/serie/…",
+  GenericNameComponent: "Un componente normal del nombre (tipo 8). Los bytes que no son letras, cifras ni -._~ se escriben como %XX en la URI.",
+  SegmentNameComponent: "Componente de segmento (tipo 50), de las convenciones de nombres de NDN. Su valor es un entero, y en la URI se escribe seg=N.",
+  Nonce: "4 bytes aleatorios que identifican este Interest. Los routers los usan para detectar bucles y duplicados. Cada reintento lleva uno nuevo.",
+  InterestLifetime: "Cuánto espera cada router la respuesta antes de dar el Interest por perdido. Nuestro reproductor usa 2000 ms; si no aparece, son 4000 ms.",
+  MetaInfo: "Metadatos del Data. El ContentType no se escribe porque es el de por defecto (BLOB, datos normales).",
+  FreshnessPeriod: "Cuánto tiempo puede una caché considerar fresco este Data: 1 hora, el valor del productor para episodios.",
+  Content: "El contenido: el manifiesto. Son 20 bytes porque los tamaños van a escala 1:1000 (unos 20 KB reales).",
+  SignatureInfo: "Cómo está firmado el Data.",
+  SignatureType: "0 = DigestSha256: la firma más simple de la especificación, un resumen SHA-256 sin clave. Un productor real firmaría con su clave (por ejemplo, tipo 3, ECDSA).",
+  SignatureValue: "El SHA-256 de todo lo anterior del Data, de Name a SignatureInfo.",
+};
+const INFO = {
+  interest: "Primer Interest de una sesión que funciona, tal cual está en la captura.",
+  seg: "El segundo Interest de esa sesión, tal cual está en la captura.",
+  data: "Lo que el router devolvería a la casa. No está en la captura: solo guardamos lo que sale.",
+  nack: "Lo que el router devolvería por un nombre sin ruta. No está en la captura.",
+};
+function planos(cs, out = []) { cs.forEach(c => { out.push(c); if (c.hijos) planos(c.hijos, out); }); return out; }
+function abrir(p) {
+  document.querySelectorAll("[data-p]").forEach(b => b.setAttribute("aria-pressed", b.dataset.p === p));
+  const P = D.paquetes[p], bytes = P.hex.match(/../g), todos = planos(P.campos);
+  const due = bytes.map((_, k) => { let m = null; todos.forEach(c => { if (c.ini <= k && k < c.fin && (!m || c.nivel >= m.nivel)) m = c; }); return m; });
+  const hex = document.getElementById("hex");
+  hex.innerHTML = bytes.map((b, k) => { const c = due[k]; return `<span data-k="${k}" class="${k < c.cab ? "cab" : ""}" style="background:${color(c)}">${b}</span>`; }).join("");
+  hex.querySelectorAll("span").forEach(s => s.addEventListener("click", () => elegirCampo(due[+s.dataset.k])));
+  const arbol = document.getElementById("arbol");
+  arbol.innerHTML = "";
+  let capa = null;
+  todos.forEach(c => {
+    const nueva = c.eth && c.n !== "Relleno" ? "Ethernet" : c.n === "Relleno" ? "Ethernet (final)" : "Paquete NDN (TLV)";
+    if (nueva !== capa) { capa = nueva; const d = document.createElement("div"); d.className = "capa"; d.textContent = capa; arbol.appendChild(d); }
+    const b = document.createElement("button");
+    b.type = "button"; b.setAttribute("role", "treeitem");
+    b.style.paddingLeft = (8 + c.nivel * 16) + "px";
+    b.innerHTML = `<i class="sw" style="background:${color(c)}"></i><span><span class="tn">${esc(c.n)}</span> <span class="tv">${c.v != null ? esc(c.v) : ""}</span></span>`;
+    b.addEventListener("click", () => elegirCampo(c));
+    c.btn = b; arbol.appendChild(b);
+  });
+  document.getElementById("hex-info").textContent = `${INFO[p]} Trama de ${bytes.length} bytes: 14 de cabecera Ethernet, ${P.ndn} del paquete NDN${bytes.length > 14 + P.ndn ? ` y ${bytes.length - 14 - P.ndn} de relleno` : ""}. En el CSV, bytes = ${P.ndn}.`;
+  elegirCampo(todos.find(c => c.t === (p === "data" ? 6 : p === "nack" ? 0x320 : 5)));
+}
+function elegirCampo(c) {
+  if (!c) return;
+  document.querySelectorAll("#hex span").forEach(s => { const k = +s.dataset.k; s.classList.toggle("sel", k >= c.ini && k < c.fin); });
+  document.querySelectorAll("#arbol button").forEach(b => b.classList.toggle("sel", b === c.btn));
+  const donde = `bytes ${c.ini}–${c.fin - 1} de la trama`;
+  const cab = c.eth ? `<b>${esc(c.n)}</b> · ${c.fin - c.ini} bytes, ${donde}.` :
+    `<b>${esc(c.n)}</b> · tipo ${c.t} (0x${c.t.toString(16)}), ${c.fin - c.cab} bytes de valor, ${donde}.`;
+  document.getElementById("campo-exp").innerHTML = `${cab} ${EXPL[c.n] || ""}`;
+}
+document.querySelectorAll("[data-p]").forEach(b => b.addEventListener("click", () => abrir(b.dataset.p)));
+abrir("interest");
+
+/* ---------- Columnas ---------- */
+const COLUMNAS = [
+  ["time", "pcapng", "Hora del Enhanced Packet Block, en segundos desde 1970 con microsegundos. La pone quien captura, no va en el paquete."],
+  ["src, dst", "Ethernet", "MAC de origen y de destino de la trama: la casa y su router de acceso."],
+  ["tipo", "TLV", "El tipo del primer TLV del paquete: 5 Interest, 6 Data. Si es un LpPacket (100), se mira dentro: con campo Nack es un Nack. En nuestras capturas solo hay Interest."],
+  ["nombre", "TLV", "El Name escrito como URI. Los componentes de tipo 50 se escriben seg=N."],
+  ["bytes", "TLV", "Tamaño del paquete NDN: desde su tipo hasta el final de su valor, sin la cabecera Ethernet ni el relleno."],
+  ["nonce", "TLV", "El valor del Nonce en hexadecimal, 4 bytes."],
+  ["lifetime_ms", "TLV", "InterestLifetime. Si el Interest no lo lleva, vale 4000 ms por defecto."],
+];
+const ETIQ = [
+  ["resultado", "Data o Nack:NoRoute. Lo sabría la casa al recibir la respuesta, pero no lo guardamos con la captura."],
+  ["sesion, causa, intencion", "Qué sesión del usuario generó el Interest, qué error de escritura tenía y qué nombre quería pedir. No existen en ninguna red: solo sirven para evaluar el modelo."],
+];
+document.getElementById("comp").innerHTML =
+  COLUMNAS.map(([c, d, t]) => `<tr><td>${c}</td><td><span class="chip si">${d}</span></td><td>${t}</td></tr>`).join("") +
+  ETIQ.map(([c, t]) => `<tr><td>${c}</td><td><span class="chip no">etiquetas.csv</span></td><td>${t}</td></tr>`).join("");
+const OPC = [
+  ["CanBePrefix", "Vale falso por defecto, y un campo con el valor por defecto no se escribe. El reproductor pide nombres exactos."],
+  ["MustBeFresh", "También falso por defecto: el reproductor acepta un Data de cualquier caché, esté fresco o no."],
+  ["ForwardingHint", "Sirve para dirigir el Interest hacia un prefijo distinto del nombre. Los productores anuncian sus propios nombres, así que no hace falta."],
+  ["HopLimit", "Opcional. Sin él, el Interest no tiene límite de saltos."],
+  ["ApplicationParameters", "Para mandar datos con la petición. Pedir un episodio no los necesita."],
+];
+document.getElementById("opcionales").innerHTML = OPC.map(([c, t]) => `<tr><td>${c}</td><td>${t}</td></tr>`).join("");
+</script>
